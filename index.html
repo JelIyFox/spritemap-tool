@@ -93,7 +93,7 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <option value="scene">Размер сцены (как в Animate)</option>
 <option value="each">Каждый кадр обрезать отдельно</option>
 </select>
-<select id="escale"><option value="1">Масштаб PNG: 100% (исходный)</option><option value="0.5">Масштаб PNG: 50%</option><option value="2">Масштаб PNG: 200%</option></select>
+<select id="escale"><option value="1">Размер кадров: 100% (без изменений)</option><option value="0.75">Уменьшить на 25% (размер 75%)</option><option value="0.5">Уменьшить на 50% (размер 50%)</option><option value="0.25">Уменьшить на 75% (размер 25%)</option><option value="2">Увеличить до 200%</option></select>
 <label class="row"><input type="checkbox" id="nodup" checked> <span>Сохранить без дубликатов (повторяющиеся кадры пропускаются)</span></label>
 <label class="row"><input type="checkbox" id="ren" checked> <span>Нумеровать заново подряд (0000, 0001…)</span></label>
 <label class="row"><input type="checkbox" id="bgx"> <span>Сохранять с выбранным фоном (не прозрачным)</span></label>
@@ -156,6 +156,7 @@ function boundsOf(list,b){
   })
  });return b}
 function drawOps(c,list,s,ox,oy){
+ if(s<1)c.imageSmoothingQuality='high';
  list.forEach(function(o){var sp=SPR[o.n];if(!sp||!sp.im)return;var m=o.m;
   c.save();c.globalAlpha=o.a;c.setTransform(m[0]*s,m[1]*s,m[2]*s,m[3]*s,m[4]*s+ox,m[5]*s+oy);
   if(sp.r)c.transform(0,1,-1,0,sp.h,0);
@@ -175,6 +176,8 @@ function loadImg(f){return new Promise(function(res){var im=new Image(),u=URL.cr
 function readText(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=function(){rej(r.error)};r.readAsText(f)})}
 window.addEventListener('error',function(e){toast('Ошибка: '+e.message)});
 window.addEventListener('unhandledrejection',function(e){toast('Ошибка: '+((e.reason&&e.reason.message)||e.reason))});
+var folderName='';
+function sheetName(safe){var f=folderName.replace(/[\\\/:*?"<>|]+/g,'_').trim();if(!f)return safe;return cur.n==='timeline'?f:f+'_'+safe}
 function ingestJson(name,tx){
  try{var j=JSON.parse(tx.replace(/^\uFEFF/,''));
   if(j.ATLAS){atl=atl.filter(function(a){return a.name!==name});atl.push({name:name,json:j})}
@@ -324,7 +327,7 @@ function loadFromDir(dir){
   return names.reduce(function(p,n){return p.then(function(){
    return FS.readFile({path:(dir?dir+'/':'')+n,directory:DIR}).then(function(f){
     if(/\.png$/i.test(n))return loadImgData(f.data).then(function(im){if(im)imgs[n]=im});
-    ingestJson(n,b64ToText(f.data))})})},Promise.resolve()).then(function(){refresh();saveDir=(dir?dir+'/':'')+'export';showSaveDir()})
+    ingestJson(n,b64ToText(f.data))})})},Promise.resolve()).then(function(){folderName=(dir||'').split('/').pop();refresh();saveDir=(dir?dir+'/':'')+'export';showSaveDir()})
  }).catch(function(e){toast('Не удалось прочитать папку: '+((e&&e.message)||e))})
 }
 if(NATIVE){
@@ -454,7 +457,7 @@ async function buildSheet(){
  var btn=$('sheet'),inf=$('shinfo');
  try{
  var mode=$('mode').value,MD=anim.MD||{},B=fitBox(),sc=+$('escale').value||1,pad=2,maxW=+$('shw').value||0,trim=$('trim').checked;
- var safe=cur.n.replace(/[^\w\-]+/g,'_'),info={},U=[],k,total=0,n=0;
+ var safe=cur.n.replace(/[^\w\-]+/g,'_'),info={},U=[],k,total=0,n=0,sname=sheetName(safe);
  btn.disabled=true;
  for(k=0;k<cur.du;k++)if(dupOf[k]===k)total++;
  for(k=0;k<cur.du;k++){if(dupOf[k]!==k)continue;
@@ -478,7 +481,7 @@ async function buildSheet(){
   drawOps(tc.getContext('2d'),f.L,sc,-f.r.x*sc,-f.r.y*sc);sx.drawImage(tc,f.t.x,f.t.y,f.t.w,f.t.h,f.px,f.py,f.t.w,f.t.h);
   if(d%2===1){inf.textContent='Сборка листа: '+(d+1)+' из '+U.length;await tick()}}
  function nm(k){var t=cur.i+k;if(cur.n==='timeline'){var sg=segOf(t);if(sg>0)return LB[sg].n.replace(/[^\w\-]+/g,'_')+String(t-LB[sg].i).padStart(4,'0')}return safe+String(k).padStart(4,'0')}
- var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+safe+'.png">\n';
+ var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+sname+'.png">\n';
  for(k=0;k<cur.du;k++){var g=info[dupOf[k]];
   xml+='\t<SubTexture name="'+nm(k)+'" x="'+g.px+'" y="'+g.py+'" width="'+g.t.w+'" height="'+g.t.h+'" frameX="'+(-g.t.x)+'" frameY="'+(-g.t.y)+'" frameWidth="'+g.W+'" frameHeight="'+g.H+'"/>\n'}
  xml+='</TextureAtlas>\n';
@@ -489,8 +492,8 @@ async function buildSheet(){
  if(!png){inf.textContent='Браузеру не хватило памяти на такой лист. Выбери меньший масштаб PNG.';btn.disabled=false;return}
  var msg='Лист '+SW+'×'+SH+' ('+(png.size/1048576).toFixed(1)+' МБ), кадров в XML: '+cur.du+', уникальных в PNG: '+U.length;
  var w;inf.textContent='Сохраняю…';
- if(NATIVE){await saveFile(safe+'.png',png);await saveFile(safe+'.xml',new Blob([xml],{type:'application/xml'}));w=where('')}
- else{var ab=await new Response(png).arrayBuffer();await saveFile(safe+'_sheet.zip',makeZip([{name:safe+'.png',data:new Uint8Array(ab)},{name:safe+'.xml',data:new TextEncoder().encode(xml)}]));w=where(safe+'_sheet.zip')+' (внутри ZIP лежат '+safe+'.png и '+safe+'.xml)'}
+ if(NATIVE){await saveFile(sname+'.png',png);await saveFile(sname+'.xml',new Blob([xml],{type:'application/xml'}));w=where('')}
+ else{var ab=await new Response(png).arrayBuffer();await saveFile(sname+'_sheet.zip',makeZip([{name:sname+'.png',data:new Uint8Array(ab)},{name:sname+'.xml',data:new TextEncoder().encode(xml)}]));w=where(sname+'_sheet.zip')+' (внутри ZIP лежат '+sname+'.png и '+sname+'.xml)'}
  inf.textContent=msg+'. Сохранено: '+w;toast('Готово: спрайт-лист и XML');
  }catch(e){inf.textContent='';failMsg(e)}
  btn.disabled=false;
