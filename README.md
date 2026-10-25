@@ -1,1 +1,0 @@
-# spritemap-tool
