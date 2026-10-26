@@ -57,13 +57,7 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <h1>Spritemap Tool</h1>
 <p class="s">Просмотр анимаций из Adobe Animate (Better TA), удаление кадров и экспорт кадров в PNG.</p>
 
-<section>
-<h2>1. Файлы</h2>
-<div class="row"><label class="btn p">Выбрать файл<input id="one" type="file" multiple hidden></label><button class="p" id="nfold" style="display:none">Выбрать папку</button></div>
-<div class="hint" id="h1">Выбирай файлы spritemap1.png, spritemap1.json и Animation.json. Можно выбрать сразу несколько или добавлять по одному: файлы накапливаются.</div>
-<div class="chips" id="chips"></div>
-</section>
-
+<div class="row" id="tabs"><button class="p" id="tA">Из спрайтмапа</button><button id="tB">Готовый спрайт-лист</button></div>
 <section id="fb" style="display:none">
 <h2 id="fbt">Выбор папки</h2>
 <div class="bp" id="bp"></div>
@@ -71,11 +65,21 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="row"><button id="bup">Назад</button><button id="bnew">Новая папка</button></div>
 <div class="row"><button class="p" id="bok">Использовать эту папку</button><button id="bno">Отмена</button></div>
 </section>
+<div id="tabA">
+<section>
+<h2>1. Файлы</h2>
+<div class="row"><label class="btn p">Выбрать файл<input id="one" type="file" multiple hidden></label><button class="p" id="nfold" style="display:none">Выбрать папку</button></div>
+<div class="hint" id="h1">Выбирай файлы spritemap1.png, spritemap1.json и Animation.json. Можно выбрать сразу несколько или добавлять по одному: файлы накапливаются.</div>
+<div class="chips" id="chips"></div>
+</section>
+
 
 <section id="s2" style="display:none">
 <h2>2. Анимация</h2>
 <div class="alist" id="lablist"></div>
 <div class="pvw"><canvas class="pv" id="pv" width="300" height="220"></canvas></div>
+<label class="row" style="margin:0 0 8px"><input type="checkbox" id="cmp"> <span>Сравнить с выбранным уменьшением кадров</span></label>
+<div class="pvw" id="pvw2" style="display:none"><canvas class="pv" id="pv2" width="1" height="1"></canvas></div>
 <input type="range" id="sl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
 <div class="row"><button id="prev">⏮</button><button id="play">▶ Играть</button><button id="next">⏭</button><span class="hint" id="pinfo" style="margin:0"></span></div>
 <div class="row"><label class="hint" style="margin:0">FPS <input type="number" id="fps" min="1" max="120" value="24"></label>
@@ -115,6 +119,28 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <textarea id="jt" spellcheck="false" autocapitalize="off"></textarea>
 <div class="row" style="margin-top:10px"><button class="p" id="japp">Применить правки</button><button id="jsave">Сохранить файл</button></div>
 </section>
+</div>
+<div id="tabB" style="display:none">
+<section>
+<h2>Готовый спрайт-лист</h2>
+<div class="row"><label class="btn p">Выбрать PNG и XML<input id="osf" type="file" multiple hidden></label><button class="p" id="osb" style="display:none">Выбрать из папки</button></div>
+<div class="chips" id="ochips"></div>
+</section>
+<section id="os2" style="display:none">
+<h2>Предпросмотр и оптимизация</h2>
+<select id="oa"></select>
+<select id="ol"><option value="0.75">Уменьшить на 25% (размер 75%)</option><option value="0.5" selected>Уменьшить на 50% (размер 50%)</option><option value="0.25">Уменьшить на 75% (размер 25%)</option></select>
+<div class="hint" id="ot1" style="margin:0 0 4px"></div>
+<div class="pvw" id="opw"><canvas class="pv" id="opv1" width="1" height="1"></canvas></div>
+<div class="hint" id="ot2" style="margin:0 0 4px"></div>
+<div class="pvw"><canvas class="pv" id="opv2" width="1" height="1"></canvas></div>
+<input type="range" id="osl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
+<div class="row"><button id="oplay">▶ Играть</button><label class="hint" style="margin:0">FPS <input type="number" id="ofps" min="1" max="120" value="24"></label></div>
+<button class="p" id="obuild">Пересобрать и сохранить</button>
+<div id="osdr"><div class="hint" id="osd" style="display:none"></div><button id="oschg" style="display:none;margin-top:8px">Сменить папку сохранения</button></div>
+<div class="hint" id="oinfo"></div>
+</section>
+</div>
 </main>
 <div id="toast"></div>
 
@@ -251,6 +277,8 @@ function drawPv(k){
  else{sc=+z;c.width=Math.min(4096,Math.ceil(B.w*sc));c.height=Math.min(4096,Math.ceil(B.h*sc));ox=-B.x*sc;oy=-B.y*sc;c.style.maxWidth='none'}
  drawOps(c.getContext('2d'),opsAt(cur.i+k),sc,ox,oy);
  $('sl').value=k;$('pinfo').textContent='Кадр '+k+' / '+(cur.du-1)+' (глобально '+(cur.i+k)+')'+(dupOf[k]!==k?' · повтор кадра '+dupOf[k]:'')
+ var on=$('cmp').checked&&(+$('escale').value)!==1;$('pvw2').style.display=on?'block':'none';
+ if(on){var c2=$('pv2'),s2=+$('escale').value,w2=Math.max(1,Math.ceil(B.w*s2)),h2=Math.max(1,Math.ceil(B.h*s2));c2.width=w2;c2.height=h2;drawOps(c2.getContext('2d'),opsAt(cur.i+k),s2,-B.x*s2,-B.y*s2);c2.style.width=Math.round(B.w*sc)+'px';c2.style.height=Math.round(B.h*sc)+'px';c2.style.maxWidth='none'}
 }
 function applyBg(){var v=$('bgs').value,c=$('pv');if(v==='chk'){c.style.backgroundColor='';c.style.backgroundImage=''}else{c.style.backgroundImage='none';c.style.backgroundColor=v}}
 function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='▶ Играть'}
@@ -300,9 +328,9 @@ function where(n){return NATIVE?ROOT+saveDir+(n?'/'+n:''):'файл ушёл н�
 function b64ToText(b){var bin=atob(b),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u)}
 function blobToB64(bl){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(',')[1])};r.onerror=rej;r.readAsDataURL(bl)})}
 function nativeSave(name,blob){return blobToB64(blob).then(function(b){return FS.writeFile({path:saveDir+'/'+name,data:b,directory:DIR,recursive:true})})}
-function showSaveDir(){if(!NATIVE)return;$('sdirrow').style.display='block';$('sdir').textContent='Сохранять в: '+ROOT+saveDir}
+function showSaveDir(){if(!NATIVE)return;if($('osd')){$('osd').style.display='block';$('osd').textContent='Сохранять в: '+ROOT+saveDir;$('oschg').style.display='inline-block'}$('sdirrow').style.display='block';$('sdir').textContent='Сохранять в: '+ROOT+saveDir}
 function openBrowser(mode,start){
- fbMode=mode;$('fb').style.display='block';$('fbt').textContent=mode==='load'?'Папка с файлами спрайтмапа':'Папка для сохранения';
+ fbMode=mode;$('fb').style.display='block';$('fbt').textContent=mode==='sheet'?'Выбери PNG спрайт-листа':mode==='load'?'Папка с файлами спрайтмапа':'Папка для сохранения';
  var go=function(){browse(start||'')};FS.requestPermissions().then(go,go);$('fb').scrollIntoView()
 }
 var FRE=/^spritemap\d*\.(png|json)$/i,ARE=/^animation\.json$/i;
@@ -314,8 +342,15 @@ function browse(p){
   var by=function(a,b){return a.name.localeCompare(b.name)};
   all.filter(function(f){return f.type==='directory'}).sort(by).forEach(function(f){
    var b=document.createElement('button');b.textContent='📁 '+f.name;b.onclick=function(){browse(fbPath?fbPath+'/'+f.name:f.name)};l.appendChild(b)});
+  if(fbMode==='sheet'){
+   var xs={};all.forEach(function(f){xs[f.name.toLowerCase()]=1});
+   all.filter(function(f){return f.type!=='directory'&&/\.png$/i.test(f.name)}).sort(by).forEach(function(f){
+    var has=xs[f.name.replace(/\.png$/i,'.xml').toLowerCase()],bt=document.createElement('button');
+    bt.textContent=(has?'🖼 ':'⚠ ')+f.name+(has?'':' (нет XML)');bt.onclick=function(){$('fb').style.display='none';oLoadDir(fbPath,f.name)};l.appendChild(bt)})
+  }else{
   var fl=all.filter(function(f){return f.type!=='directory'&&(FRE.test(f.name)||ARE.test(f.name))}).sort(by);
   fl.forEach(function(f){var d=document.createElement('div');d.className='fl';d.textContent='✓ '+f.name;l.appendChild(d)});
+  }
   if(!l.children.length){var e=document.createElement('div');e.className='fl';e.textContent='Здесь нет папок и нужных файлов.';l.appendChild(e)}
  }).catch(function(){$('bl').innerHTML='';toast(NOACC)})
 }
@@ -340,7 +375,7 @@ if(NATIVE){
   FS.mkdir({path:(fbPath?fbPath+'/':'')+n.replace(/[\/\\]/g,''),directory:DIR,recursive:true}).then(function(){browse(fbPath)},function(){toast(NOACC)})});
  $('bok').addEventListener('click',function(){
   $('fb').style.display='none';
-  if(fbMode==='load')loadFromDir(fbPath);else{saveDir=fbPath||'Download/SpritemapTool';showSaveDir();toast('Папка сохранения: '+saveDir)}
+  if(fbMode==='load')loadFromDir(fbPath);else if(fbMode==='save'){saveDir=fbPath||'Download/SpritemapTool';showSaveDir();toast('Папка сохранения: '+saveDir)}
  })
 }
 
@@ -499,6 +534,115 @@ async function buildSheet(){
  btn.disabled=false;
 }
 $('sheet').addEventListener('click',buildSheet);
+$('cmp').addEventListener('change',function(){if(cur)drawPv(pk)});
+$('escale').addEventListener('change',function(){if(cur)drawPv(pk)});
+
+/* ===== ready sprite sheet optimizer ===== */
+var OS={img:null,imgName:'',size:0,subs:[],anims:{},names:[]},otimer=null,opk=0;
+function tab(b){$('tabA').style.display=b?'none':'block';$('tabB').style.display=b?'block':'none';$('tA').className=b?'':'p';$('tB').className=b?'p':'';stop();oStop()}
+$('tA').addEventListener('click',function(){tab(false)});
+$('tB').addEventListener('click',function(){tab(true)});
+function escX(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function oDims(sb,s){
+ var fx=sb.fx||0,fy=sb.fy||0,fw=sb.fw||sb.w,fh=sb.fh||sb.h,
+ x0=Math.round(-fx*s),y0=Math.round(-fy*s),x1=Math.round((-fx+sb.w)*s),y1=Math.round((-fy+sb.h)*s),
+ w=Math.max(1,x1-x0),h=Math.max(1,y1-y0);
+ return{x0:x0,y0:y0,w:w,h:h,FW:Math.max(Math.round(fw*s),x0+w),FH:Math.max(Math.round(fh*s),y0+h)}
+}
+function oIngest(img,imgName,size,xml){
+ var doc=new DOMParser().parseFromString(xml,'text/xml');
+ if(doc.getElementsByTagName('parsererror').length){toast('Не удалось прочитать XML');return false}
+ var nodes=[].slice.call(doc.getElementsByTagName('SubTexture')),subs=[];
+ if(!nodes.length){toast('В XML нет кадров (SubTexture)');return false}
+ for(var i=0;i<nodes.length;i++){var n=nodes[i],g=function(a){var v=n.getAttribute(a);return v===null?null:Math.round(parseFloat(v))};
+  if(n.getAttribute('rotated')==='true'){toast('Повёрнутые кадры в этом листе не поддерживаются');return false}
+  subs.push({name:n.getAttribute('name')||('frame'+i),x:g('x'),y:g('y'),w:g('width'),h:g('height'),fx:g('frameX')||0,fy:g('frameY')||0,fw:g('frameWidth'),fh:g('frameHeight')})}
+ OS.img=img;OS.imgName=imgName;OS.size=size;OS.subs=subs;OS.anims={};OS.names=[];
+ subs.forEach(function(sb,i){var m=/^(.*?)(\d{4})$/.exec(sb.name)||/^(.*?)(\d+)$/.exec(sb.name),base=m&&m[1]?m[1]:(m?'кадры':sb.name),idx=m?parseInt(m[2],10):i;sb.idx=idx;(OS.anims[base]=OS.anims[base]||[]).push(sb)});
+ OS.names=Object.keys(OS.anims);OS.names.forEach(function(k){OS.anims[k].sort(function(a,b){return a.idx-b.idx})});
+ var sel=$('oa');sel.innerHTML='';OS.names.forEach(function(k,i){var o=document.createElement('option');o.value=i;o.textContent=k+' ('+OS.anims[k].length+' кадр.)';sel.appendChild(o)});
+ $('ochips').innerHTML='<span class="chip ok">'+escX(imgName)+' · '+img.naturalWidth+'×'+img.naturalHeight+'</span><span class="chip ok">кадров в XML: '+subs.length+'</span>';
+ $('os2').style.display='block';oPick();return true
+}
+function oAnim(){return OS.anims[OS.names[$('oa').value|0]]||[]}
+function oFrame(sb,s){var d=oDims(sb,s),c=document.createElement('canvas');c.width=d.FW;c.height=d.FH;var x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(OS.img,sb.x,sb.y,sb.w,sb.h,d.x0,d.y0,d.w,d.h);return c}
+function oPick(){oStop();var l=oAnim();$('osl').max=Math.max(0,l.length-1);oDraw(0)}
+function oDraw(k){
+ var l=oAnim();if(!l.length)return;opk=k;var sb=l[k],s=+$('ol').value,mw=0,mh=0;
+ l.forEach(function(b){mw=Math.max(mw,b.fw||b.w);mh=Math.max(mh,b.fh||b.h)});
+ var c1=$('opv1'),c2=$('opv2'),rw=Math.max(1,Math.round(mw*s)),rh=Math.max(1,Math.round(mh*s));
+ c1.width=mw;c1.height=mh;c1.getContext('2d').drawImage(oFrame(sb,1),0,0);
+ c2.width=rw;c2.height=rh;c2.getContext('2d').drawImage(oFrame(sb,s),0,0);
+ var dw=Math.min(mw,Math.max(120,($('opw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);
+ [c1,c2].forEach(function(c){c.style.width=dw+'px';c.style.height=dh+'px';c.style.maxWidth='none'});
+ var pct=Math.round((1-s)*100);
+ $('ot1').textContent='Оригинал: '+mw+'×'+mh;$('ot2').textContent='После уменьшения на '+pct+'%: '+rw+'×'+rh+' (растянуто до размера оригинала, чтобы видеть потерю качества)';
+ $('osl').value=k
+}
+function oStop(){if(otimer){clearInterval(otimer);otimer=null}$('oplay').textContent='▶ Играть'}
+$('oa').addEventListener('change',oPick);
+$('ol').addEventListener('change',function(){oDraw(opk)});
+$('osl').addEventListener('input',function(){oStop();oDraw(+this.value)});
+$('oplay').addEventListener('click',function(){
+ if(otimer){oStop();return}
+ var f=Math.max(1,+$('ofps').value||24);$('oplay').textContent='⏸ Пауза';
+ otimer=setInterval(function(){oDraw((opk+1)%oAnim().length)},1000/f)
+});
+$('ofps').addEventListener('change',function(){if(otimer){oStop();$('oplay').click()}});
+async function oLoad(fl){
+ var png=null,xml=null;
+ for(var i=0;i<fl.length;i++){var f=fl[i];
+  if(/\.png$/i.test(f.name)){var im=await loadImg(f);if(im)png={img:im,name:f.name,size:f.size}}
+  else if(/\.xml$/i.test(f.name))xml=await readText(f)}
+ if(png)OS.pend=png;if(xml!==null)OS.pendXml=xml;
+ if(OS.pend&&OS.pendXml!==undefined){var ok=oIngest(OS.pend.img,OS.pend.name,OS.pend.size,OS.pendXml);if(!ok){OS.pendXml=undefined}}
+ else $('ochips').innerHTML=(OS.pend?'<span class="chip ok">'+escX(OS.pend.name)+'</span>':'')+(OS.pendXml!==undefined?'<span class="chip ok">XML загружен</span>':'')+'<span class="chip">нужны и PNG, и XML</span>'
+}
+$('osf').addEventListener('change',function(e){var fl=[].slice.call(e.target.files);e.target.value='';oLoad(fl).catch(function(err){toast('Ошибка: '+((err&&err.message)||err))})});
+function oLoadDir(dir,pngName){
+ var base=(dir?dir+'/':'')+pngName.replace(/\.png$/i,'');
+ return FS.readFile({path:base+'.png',directory:DIR}).then(function(f){return loadImgData(f.data).then(function(im){
+  if(!im){toast('Не удалось открыть PNG');return}
+  return FS.readFile({path:base+'.xml',directory:DIR}).then(function(x){oIngest(im,pngName,Math.round(f.data.length*0.75),b64ToText(x.data))})})}).catch(function(e){toast('Не удалось загрузить лист: '+((e&&e.message)||e))})
+}
+if(NATIVE){$('osb').style.display='inline-block';$('osb').addEventListener('click',function(){openBrowser('sheet','')});$('oschg').addEventListener('click',function(){openBrowser('save',saveDir)})}
+async function oBuild(){
+ var btn=$('obuild'),inf=$('oinfo');
+ if(!OS.img||!OS.subs.length){toast('Сначала загрузи PNG и XML листа');return}
+ var s=+$('ol').value,pad=2,pieces={},P=[],i,pct=Math.round((1-s)*100);
+ try{
+  btn.disabled=true;
+  OS.subs.forEach(function(sb){var key=[sb.x,sb.y,sb.w,sb.h,sb.fx,sb.fy].join(',');if(!pieces[key]){pieces[key]={sb:sb,d:oDims(sb,s)};P.push(pieces[key])}sb.key=key});
+  for(i=0;i<P.length;i++){var p=P[i],c=document.createElement('canvas');c.width=p.d.w;c.height=p.d.h;var cx=c.getContext('2d');cx.imageSmoothingQuality='high';cx.drawImage(OS.img,p.sb.x,p.sb.y,p.sb.w,p.sb.h,0,0,p.d.w,p.d.h);p.c=c;
+   if(i%8===7){inf.textContent='Уменьшение кадров: '+(i+1)+' из '+P.length;await tick()}}
+  var ar=0,mw=0;P.forEach(function(p){ar+=(p.d.w+pad)*(p.d.h+pad);mw=Math.max(mw,p.d.w+2*pad)});
+  var maxW=Math.max(mw,Math.ceil(Math.sqrt(ar)));
+  P.sort(function(a,b){return b.d.h-a.d.h||a.d.w-b.d.w});
+  var x=pad,y=pad,rowH=0,usedW=0;
+  P.forEach(function(p){if(x+p.d.w+pad>maxW&&x>pad){x=pad;y+=rowH+pad;rowH=0}p.px=x;p.py=y;x+=p.d.w+pad;rowH=Math.max(rowH,p.d.h);usedW=Math.max(usedW,x)});
+  var SW=usedW,SH=y+rowH+pad;
+  if(SW>16384||SH>16384){toast('Лист получился больше 16384 px');inf.textContent='';btn.disabled=false;return}
+  var sh=document.createElement('canvas');sh.width=SW;sh.height=SH;var sx=sh.getContext('2d');
+  P.forEach(function(p){sx.drawImage(p.c,p.px,p.py);p.c=null});
+  var out=OS.imgName.replace(/\.png$/i,'')+'_opt'+pct;
+  var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+escX(out)+'.png">\n';
+  OS.subs.forEach(function(sb){var p=pieces[sb.key];
+   xml+='\t<SubTexture name="'+escX(sb.name)+'" x="'+p.px+'" y="'+p.py+'" width="'+p.d.w+'" height="'+p.d.h+'" frameX="'+(-p.d.x0)+'" frameY="'+(-p.d.y0)+'" frameWidth="'+p.d.FW+'" frameHeight="'+p.d.FH+'"/>\n'});
+  xml+='</TextureAtlas>\n';
+  inf.textContent='Сжатие PNG…';await tick();
+  var png=null;try{png=await encodePng(sh,function(a,b){inf.textContent='Сжатие PNG: '+Math.round(a*100/b)+'%'})}catch(e){png=null}
+  if(!png)png=await new Promise(function(res){sh.toBlob(res,'image/png')});
+  if(!png){inf.textContent='Браузеру не хватило памяти на такой лист.';btn.disabled=false;return}
+  var msg='Было '+(OS.size/1048576).toFixed(1)+' МБ ('+OS.img.naturalWidth+'×'+OS.img.naturalHeight+'), стало '+(png.size/1048576).toFixed(1)+' МБ ('+SW+'×'+SH+')';
+  var w;inf.textContent='Сохраняю…';
+  if(NATIVE){await saveFile(out+'.png',png);await saveFile(out+'.xml',new Blob([xml],{type:'application/xml'}));w=where('')}
+  else{var ab=await new Response(png).arrayBuffer();await saveFile(out+'_sheet.zip',makeZip([{name:out+'.png',data:new Uint8Array(ab)},{name:out+'.xml',data:new TextEncoder().encode(xml)}]));w=where(out+'_sheet.zip')+' (внутри ZIP лежат '+out+'.png и '+out+'.xml)'}
+  inf.textContent=msg+'. Сохранено: '+w+'. Файлы: '+out+'.png и '+out+'.xml';toast('Готово: лист уменьшен на '+pct+'%');
+ }catch(e){inf.textContent='';failMsg(e)}
+ btn.disabled=false
+}
+$('obuild').addEventListener('click',oBuild);
+
 $('exp').addEventListener('click',function(){doExport(false)});
 $('expz').addEventListener('click',function(){doExport(true)});
 })();
