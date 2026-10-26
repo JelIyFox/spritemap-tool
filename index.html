@@ -57,7 +57,7 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <h1>Spritemap Tool</h1>
 <p class="s">Просмотр анимаций из Adobe Animate (Better TA), удаление кадров и экспорт кадров в PNG.</p>
 
-<div class="row" id="tabs"><button class="p" id="tA">Из спрайтмапа</button><button id="tB">Готовый спрайт-лист</button></div>
+<div class="row" id="tabs"><button class="p" id="tA">Из спрайтмапа</button><button id="tB">Готовый спрайт-лист</button><button id="tC">Из PNG-кадров</button></div>
 <section id="fb" style="display:none">
 <h2 id="fbt">Выбор папки</h2>
 <div class="bp" id="bp"></div>
@@ -134,11 +134,31 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="pvw" id="opw"><canvas class="pv" id="opv1" width="1" height="1"></canvas></div>
 <div class="hint" id="ot2" style="margin:0 0 4px"></div>
 <div class="pvw"><canvas class="pv" id="opv2" width="1" height="1"></canvas></div>
+<h2 style="margin:14px 0 8px">Корректировка frameX / frameY</h2>
+<div class="hint" style="margin:0 0 4px">Наложение: оригинал и результат (полупрозрачные). Двоящийся контур значит, что кадр сместился.</div>
+<div class="pvw"><canvas class="pv" id="opv3" width="1" height="1"></canvas></div>
+<div class="hint" id="oval" style="margin:0 0 6px"></div>
+<div class="row" style="justify-content:center"><button id="oL">◀</button><button id="oU">▲</button><button id="oD">▼</button><button id="oR">▶</button></div>
+<select id="oscope"><option value="frame">Применять: только к этому кадру</option><option value="anim">Применять: ко всей анимации</option><option value="all">Применять: ко всем кадрам листа</option></select>
+<div class="row"><button id="orst">Сбросить корректировку</button></div>
 <input type="range" id="osl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
 <div class="row"><button id="oplay">▶ Играть</button><label class="hint" style="margin:0">FPS <input type="number" id="ofps" min="1" max="120" value="24"></label></div>
 <button class="p" id="obuild">Пересобрать и сохранить</button>
 <div id="osdr"><div class="hint" id="osd" style="display:none"></div><button id="oschg" style="display:none;margin-top:8px">Сменить папку сохранения</button></div>
 <div class="hint" id="oinfo"></div>
+</section>
+</div>
+<div id="tabC" style="display:none">
+<section>
+<h2>Сборка листа из PNG-кадров</h2>
+<div class="row"><label class="btn p">Выбрать PNG-кадры<input id="cf" type="file" accept="image/png" multiple hidden></label><button class="p" id="cfb" style="display:none">Выбрать папку</button></div>
+<div class="chips" id="cchips"></div>
+<input type="text" id="cname" placeholder="Название листа" style="width:100%;margin-bottom:10px">
+<select id="cl"><option value="1">Размер кадров: 100% (без изменений)</option><option value="0.75">Уменьшить на 25% (размер 75%)</option><option value="0.5">Уменьшить на 50% (размер 50%)</option><option value="0.25">Уменьшить на 75% (размер 25%)</option></select>
+<label class="row"><input type="checkbox" id="ctrim" checked> <span>Обрезать пустые края кадров (смещения пишутся в XML)</span></label>
+<label class="row"><input type="checkbox" id="cdup" checked> <span>Одинаковые кадры хранить в PNG один раз (в XML остаются все)</span></label>
+<button class="p" id="cbuild">Собрать спрайт-лист и XML</button>
+<div class="hint" id="cinfo"></div>
 </section>
 </div>
 </main>
@@ -330,7 +350,7 @@ function blobToB64(bl){return new Promise(function(res,rej){var r=new FileReader
 function nativeSave(name,blob){return blobToB64(blob).then(function(b){return FS.writeFile({path:saveDir+'/'+name,data:b,directory:DIR,recursive:true})})}
 function showSaveDir(){if(!NATIVE)return;if($('osd')){$('osd').style.display='block';$('osd').textContent='Сохранять в: '+ROOT+saveDir;$('oschg').style.display='inline-block'}$('sdirrow').style.display='block';$('sdir').textContent='Сохранять в: '+ROOT+saveDir}
 function openBrowser(mode,start){
- fbMode=mode;$('fb').style.display='block';$('fbt').textContent=mode==='sheet'?'Выбери PNG спрайт-листа':mode==='load'?'Папка с файлами спрайтмапа':'Папка для сохранения';
+ fbMode=mode;$('fb').style.display='block';$('fbt').textContent=mode==='frames'?'Выбери папку с PNG-кадрами':mode==='sheet'?'Выбери PNG спрайт-листа':mode==='load'?'Папка с файлами спрайтмапа':'Папка для сохранения';
  var go=function(){browse(start||'')};FS.requestPermissions().then(go,go);$('fb').scrollIntoView()
 }
 var FRE=/^spritemap\d*\.(png|json)$/i,ARE=/^animation\.json$/i;
@@ -348,7 +368,7 @@ function browse(p){
     var has=xs[f.name.replace(/\.png$/i,'.xml').toLowerCase()],bt=document.createElement('button');
     bt.textContent=(has?'🖼 ':'⚠ ')+f.name+(has?'':' (нет XML)');bt.onclick=function(){$('fb').style.display='none';oLoadDir(fbPath,f.name)};l.appendChild(bt)})
   }else{
-  var fl=all.filter(function(f){return f.type!=='directory'&&(FRE.test(f.name)||ARE.test(f.name))}).sort(by);
+  var fl=all.filter(function(f){return f.type!=='directory'&&(fbMode==='frames'?/\.png$/i.test(f.name):(FRE.test(f.name)||ARE.test(f.name)))}).sort(by);
   fl.forEach(function(f){var d=document.createElement('div');d.className='fl';d.textContent='✓ '+f.name;l.appendChild(d)});
   }
   if(!l.children.length){var e=document.createElement('div');e.className='fl';e.textContent='Здесь нет папок и нужных файлов.';l.appendChild(e)}
@@ -375,7 +395,7 @@ if(NATIVE){
   FS.mkdir({path:(fbPath?fbPath+'/':'')+n.replace(/[\/\\]/g,''),directory:DIR,recursive:true}).then(function(){browse(fbPath)},function(){toast(NOACC)})});
  $('bok').addEventListener('click',function(){
   $('fb').style.display='none';
-  if(fbMode==='load')loadFromDir(fbPath);else if(fbMode==='save'){saveDir=fbPath||'Download/SpritemapTool';showSaveDir();toast('Папка сохранения: '+saveDir)}
+  if(fbMode==='load')loadFromDir(fbPath);else if(fbMode==='frames')cLoadDir(fbPath);else if(fbMode==='save'){saveDir=fbPath||'Download/SpritemapTool';showSaveDir();toast('Папка сохранения: '+saveDir)}
  })
 }
 
@@ -539,14 +559,16 @@ $('escale').addEventListener('change',function(){if(cur)drawPv(pk)});
 
 /* ===== ready sprite sheet optimizer ===== */
 var OS={img:null,imgName:'',size:0,subs:[],anims:{},names:[]},otimer=null,opk=0;
-function tab(b){$('tabA').style.display=b?'none':'block';$('tabB').style.display=b?'block':'none';$('tA').className=b?'':'p';$('tB').className=b?'p':'';stop();oStop()}
-$('tA').addEventListener('click',function(){tab(false)});
-$('tB').addEventListener('click',function(){tab(true)});
+function tab(n){['tabA','tabB','tabC'].forEach(function(id,i){$(id).style.display=i===n?'block':'none'});['tA','tB','tC'].forEach(function(id,i){$(id).className=i===n?'p':''});stop();oStop()}
+$('tA').addEventListener('click',function(){tab(0)});
+$('tB').addEventListener('click',function(){tab(1)});
+$('tC').addEventListener('click',function(){tab(2)});
 function escX(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function oDims(sb,s){
+function oDims(sb,s,noadj){
  var fx=sb.fx||0,fy=sb.fy||0,fw=sb.fw||sb.w,fh=sb.fh||sb.h,
  x0=Math.round(-fx*s),y0=Math.round(-fy*s),x1=Math.round((-fx+sb.w)*s),y1=Math.round((-fy+sb.h)*s),
  w=Math.max(1,x1-x0),h=Math.max(1,y1-y0);
+ if(!noadj){x0+=sb.dx||0;y0+=sb.dy||0}
  return{x0:x0,y0:y0,w:w,h:h,FW:Math.max(Math.round(fw*s),x0+w),FH:Math.max(Math.round(fh*s),y0+h)}
 }
 function oIngest(img,imgName,size,xml){
@@ -565,23 +587,29 @@ function oIngest(img,imgName,size,xml){
  $('os2').style.display='block';oPick();return true
 }
 function oAnim(){return OS.anims[OS.names[$('oa').value|0]]||[]}
-function oFrame(sb,s){var d=oDims(sb,s),c=document.createElement('canvas');c.width=d.FW;c.height=d.FH;var x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(OS.img,sb.x,sb.y,sb.w,sb.h,d.x0,d.y0,d.w,d.h);return c}
+function oFrame(sb,s,noadj){var d=oDims(sb,s,noadj),c=document.createElement('canvas');c.width=d.FW;c.height=d.FH;var x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(OS.img,sb.x,sb.y,sb.w,sb.h,d.x0,d.y0,d.w,d.h);return c}
 function oPick(){oStop();var l=oAnim();$('osl').max=Math.max(0,l.length-1);oDraw(0)}
 function oDraw(k){
  var l=oAnim();if(!l.length)return;opk=k;var sb=l[k],s=+$('ol').value,mw=0,mh=0;
  l.forEach(function(b){mw=Math.max(mw,b.fw||b.w);mh=Math.max(mh,b.fh||b.h)});
  var c1=$('opv1'),c2=$('opv2'),rw=Math.max(1,Math.round(mw*s)),rh=Math.max(1,Math.round(mh*s));
- c1.width=mw;c1.height=mh;c1.getContext('2d').drawImage(oFrame(sb,1),0,0);
- c2.width=rw;c2.height=rh;c2.getContext('2d').drawImage(oFrame(sb,s),0,0);
+ c1.width=mw;c1.height=mh;var o1=oFrame(sb,1,true);c1.getContext('2d').drawImage(o1,0,0);
+ c2.width=rw;c2.height=rh;var r1=oFrame(sb,s);c2.getContext('2d').drawImage(r1,0,0);
+ var c3=$('opv3');c3.width=rw;c3.height=rh;var x3=c3.getContext('2d');x3.imageSmoothingQuality='high';x3.globalAlpha=.5;x3.drawImage(o1,0,0,Math.round(o1.width*s),Math.round(o1.height*s));x3.drawImage(r1,0,0);
+ var dd=oDims(sb,s);$('oval').textContent='frameX '+(-dd.x0)+' · frameY '+(-dd.y0)+' (корректировка кадра: '+(sb.dx||0)+', '+(sb.dy||0)+')';
  var dw=Math.min(mw,Math.max(120,($('opw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);
- [c1,c2].forEach(function(c){c.style.width=dw+'px';c.style.height=dh+'px';c.style.maxWidth='none'});
+ [c1,c2,$('opv3')].forEach(function(c){c.style.width=dw+'px';c.style.height=dh+'px';c.style.maxWidth='none'});
  var pct=Math.round((1-s)*100);
  $('ot1').textContent='Оригинал: '+mw+'×'+mh;$('ot2').textContent='После уменьшения на '+pct+'%: '+rw+'×'+rh+' (растянуто до размера оригинала, чтобы видеть потерю качества)';
  $('osl').value=k
 }
 function oStop(){if(otimer){clearInterval(otimer);otimer=null}$('oplay').textContent='▶ Играть'}
 $('oa').addEventListener('change',oPick);
-$('ol').addEventListener('change',function(){oDraw(opk)});
+$('ol').addEventListener('change',function(){var any=OS.subs.some(function(b){return b.dx||b.dy});OS.subs.forEach(function(b){b.dx=0;b.dy=0});if(any)toast('Корректировка сброшена: уровень изменён');oDraw(opk)});
+function oAdj(dx,dy){var sc=$('oscope').value,l=oAnim(),sb=l[opk];if(!sb)return;(sc==='frame'?[sb]:sc==='anim'?l:OS.subs).forEach(function(b){b.dx=(b.dx||0)+dx;b.dy=(b.dy||0)+dy});oDraw(opk)}
+$('oL').addEventListener('click',function(){oAdj(-1,0)});$('oR').addEventListener('click',function(){oAdj(1,0)});
+$('oU').addEventListener('click',function(){oAdj(0,-1)});$('oD').addEventListener('click',function(){oAdj(0,1)});
+$('orst').addEventListener('click',function(){var sc=$('oscope').value,l=oAnim();(sc==='frame'?[l[opk]]:sc==='anim'?l:OS.subs).forEach(function(b){if(b){b.dx=0;b.dy=0}});oDraw(opk)});
 $('osl').addEventListener('input',function(){oStop();oDraw(+this.value)});
 $('oplay').addEventListener('click',function(){
  if(otimer){oStop();return}
@@ -626,8 +654,8 @@ async function oBuild(){
   P.forEach(function(p){sx.drawImage(p.c,p.px,p.py);p.c=null});
   var out=OS.imgName.replace(/\.png$/i,'')+'_opt'+pct;
   var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+escX(out)+'.png">\n';
-  OS.subs.forEach(function(sb){var p=pieces[sb.key];
-   xml+='\t<SubTexture name="'+escX(sb.name)+'" x="'+p.px+'" y="'+p.py+'" width="'+p.d.w+'" height="'+p.d.h+'" frameX="'+(-p.d.x0)+'" frameY="'+(-p.d.y0)+'" frameWidth="'+p.d.FW+'" frameHeight="'+p.d.FH+'"/>\n'});
+  OS.subs.forEach(function(sb){var p=pieces[sb.key],d=oDims(sb,s);
+   xml+='\t<SubTexture name="'+escX(sb.name)+'" x="'+p.px+'" y="'+p.py+'" width="'+p.d.w+'" height="'+p.d.h+'" frameX="'+(-d.x0)+'" frameY="'+(-d.y0)+'" frameWidth="'+d.FW+'" frameHeight="'+d.FH+'"/>\n'});
   xml+='</TextureAtlas>\n';
   inf.textContent='Сжатие PNG…';await tick();
   var png=null;try{png=await encodePng(sh,function(a,b){inf.textContent='Сжатие PNG: '+Math.round(a*100/b)+'%'})}catch(e){png=null}
@@ -642,6 +670,73 @@ async function oBuild(){
  btn.disabled=false
 }
 $('obuild').addEventListener('click',oBuild);
+/* ===== sheet from separate PNG frames ===== */
+var CF=[];
+function nat(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true})}
+function cChips(def){
+ $('cchips').innerHTML=CF.length?'<span class="chip ok">PNG-кадров: '+CF.length+'</span>':'';
+ if(def&&!$('cname').value){$('cname').value=def}
+}
+function cDefName(){var n=(CF[0]&&CF[0].name)||'';n=n.replace(/[\d_\-\s]+$/,'');return n||'spritesheet'}
+$('cf').addEventListener('change',function(e){
+ var fl=[].slice.call(e.target.files).filter(function(f){return /\.png$/i.test(f.name)});e.target.value='';
+ if(!fl.length){toast('Выбери PNG-файлы');return}
+ CF=fl.map(function(f){return{name:f.name.replace(/\.png$/i,''),get:function(){return loadImg(f)}}}).sort(nat);
+ $('cname').value='';cChips(cDefName())
+});
+function cLoadDir(dir){
+ return FS.readdir({path:dir,directory:DIR}).then(function(r){
+  var names=(r.files||[]).map(function(f){return typeof f==='string'?{name:f}:f}).filter(function(f){return f.type!=='directory'&&/\.png$/i.test(f.name)}).sort(nat);
+  if(!names.length){toast('В папке нет PNG-файлов');return}
+  CF=names.map(function(f){return{name:f.name.replace(/\.png$/i,''),get:function(){return FS.readFile({path:(dir?dir+'/':'')+f.name,directory:DIR}).then(function(x){return loadImgData(x.data)})}}});
+  $('cname').value=(dir||'').split('/').pop()||'';cChips(cDefName())
+ }).catch(function(e){toast('Не удалось загрузить папку: '+((e&&e.message)||e))})
+}
+if(NATIVE){$('cfb').style.display='inline-block';$('cfb').addEventListener('click',function(){openBrowser('frames','')})}
+function fnv(d){var h1=2166136261,h2=5381,u=new Uint32Array(d.buffer,d.byteOffset,d.length>>2);for(var i=0;i<u.length;i++){var v=u[i];h1=Math.imul(h1^v,16777619)>>>0;h2=(Math.imul(h2,33)^v)>>>0}return h1+'.'+h2}
+async function cBuild(){
+ var btn=$('cbuild'),inf=$('cinfo');
+ if(!CF.length){toast('Сначала выбери PNG-кадры');return}
+ var s=+$('cl').value,trim=$('ctrim').checked,dd=$('cdup').checked,pad=2,items=[],seen={},U=[],i;
+ try{
+  btn.disabled=true;
+  for(i=0;i<CF.length;i++){
+   var img=await CF[i].get();if(!img){inf.textContent='Не удалось открыть '+CF[i].name+'.png';btn.disabled=false;return}
+   var W=Math.max(1,Math.round(img.naturalWidth*s)),H=Math.max(1,Math.round(img.naturalHeight*s)),c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
+   x.imageSmoothingQuality='high';x.drawImage(img,0,0,W,H);
+   var t=trim?trimBox(c):{x:0,y:0,w:W,h:H},pc=document.createElement('canvas');pc.width=t.w;pc.height=t.h;pc.getContext('2d').drawImage(c,t.x,t.y,t.w,t.h,0,0,t.w,t.h);
+   var key=dd?(t.w+'x'+t.h+':'+fnv(pc.getContext('2d').getImageData(0,0,t.w,t.h).data)):null,it={name:CF[i].name,t:t,FW:W,FH:H};
+   if(key&&seen[key]!==undefined)it.ref=seen[key];else{it.pc=pc;if(key)seen[key]=items.length;U.push(it)}
+   items.push(it);c.width=c.height=1;
+   inf.textContent='Обработка кадров: '+(i+1)+' из '+CF.length;await tick()}
+  var ar=0,mw=0;U.forEach(function(it){ar+=(it.t.w+pad)*(it.t.h+pad);mw=Math.max(mw,it.t.w+2*pad)});
+  var maxW=Math.max(mw,Math.ceil(Math.sqrt(ar)));
+  U.sort(function(a,b){return b.t.h-a.t.h});
+  var px=pad,py=pad,rowH=0,usedW=0;
+  U.forEach(function(it){if(px+it.t.w+pad>maxW&&px>pad){px=pad;py+=rowH+pad;rowH=0}it.px=px;it.py=py;px+=it.t.w+pad;rowH=Math.max(rowH,it.t.h);usedW=Math.max(usedW,px)});
+  var SW=usedW,SH=py+rowH+pad;
+  if(SW>16384||SH>16384){toast('Лист получился больше 16384 px');inf.textContent='';btn.disabled=false;return}
+  var sh=document.createElement('canvas');sh.width=SW;sh.height=SH;var sx=sh.getContext('2d');
+  U.forEach(function(it){sx.drawImage(it.pc,it.px,it.py);it.pc=null});
+  var name=($('cname').value||'spritesheet').replace(/[\\\/:*?"<>|]+/g,'_').trim()||'spritesheet';
+  var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+escX(name)+'.png">\n';
+  items.forEach(function(it){var r=it.ref!==undefined?items[it.ref]:it;
+   xml+='\t<SubTexture name="'+escX(it.name)+'" x="'+r.px+'" y="'+r.py+'" width="'+r.t.w+'" height="'+r.t.h+'" frameX="'+(-r.t.x)+'" frameY="'+(-r.t.y)+'" frameWidth="'+r.FW+'" frameHeight="'+r.FH+'"/>\n'});
+  xml+='</TextureAtlas>\n';
+  inf.textContent='Сжатие PNG…';await tick();
+  var png=null;try{png=await encodePng(sh,function(a,b){inf.textContent='Сжатие PNG: '+Math.round(a*100/b)+'%'})}catch(e){png=null}
+  if(!png)png=await new Promise(function(res){sh.toBlob(res,'image/png')});
+  if(!png){inf.textContent='Браузеру не хватило памяти на такой лист.';btn.disabled=false;return}
+  var msg='Лист '+SW+'×'+SH+' ('+(png.size/1048576).toFixed(1)+' МБ), кадров в XML: '+items.length+', уникальных в PNG: '+U.length,w;
+  inf.textContent='Сохраняю…';
+  if(NATIVE){await saveFile(name+'.png',png);await saveFile(name+'.xml',new Blob([xml],{type:'application/xml'}));w=where('')}
+  else{var ab=await new Response(png).arrayBuffer();await saveFile(name+'_sheet.zip',makeZip([{name:name+'.png',data:new Uint8Array(ab)},{name:name+'.xml',data:new TextEncoder().encode(xml)}]));w=where(name+'_sheet.zip')+' (внутри ZIP лежат '+name+'.png и '+name+'.xml)'}
+  inf.textContent=msg+'. Сохранено: '+w;toast('Готово: спрайт-лист из PNG-кадров');
+ }catch(e){inf.textContent='';failMsg(e)}
+ btn.disabled=false
+}
+$('cbuild').addEventListener('click',cBuild);
+
 
 $('exp').addEventListener('click',function(){doExport(false)});
 $('expz').addEventListener('click',function(){doExport(true)});
