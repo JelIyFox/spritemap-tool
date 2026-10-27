@@ -149,7 +149,7 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="hint" id="ot2" style="margin:0 0 4px"></div>
 <div class="pvw"><canvas class="pv" id="opv2" width="1" height="1"></canvas></div>
 <input type="range" id="osl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
-<div class="row"><button id="oplay">▶ Играть</button><label class="hint" style="margin:0">FPS <input type="number" id="ofps" min="1" max="120" value="24"></label></div>
+<div class="row"><button id="oprev">⏮</button><button id="oplay">▶ Играть</button><button id="onext">⏭</button><label class="hint" style="margin:0">FPS <input type="number" id="ofps" min="1" max="120" value="24"></label></div>
 <h2 style="margin:14px 0 8px">Корректировка frameX / frameY</h2>
 <div class="hint" id="oval" style="margin:0 0 6px"></div>
 <div class="row" style="justify-content:center"><button id="oL">◀</button><button id="oU">▲</button><button id="oD">▼</button><button id="oR">▶</button></div>
@@ -166,6 +166,14 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="row"><label class="btn p">Выбрать PNG-кадры<input id="cf" type="file" accept="image/png" multiple hidden></label><button class="p" id="cfb" style="display:none">Выбрать папку</button></div>
 <div class="chips" id="cchips"></div>
 <div class="hint" id="ccount" style="margin:8px 0"></div>
+<div id="cpbox" style="display:none">
+<div class="hint" id="cp1t" style="margin:0 0 4px"></div>
+<div class="pvw" id="cpw"><canvas class="pv" id="cpv1" width="1" height="1"></canvas></div>
+<div class="hint" id="cp2t" style="margin:0 0 4px;display:none"></div>
+<div class="pvw" id="cpw2" style="display:none"><canvas class="pv" id="cpv2" width="1" height="1"></canvas></div>
+<input type="range" id="cpsl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
+<div class="row"><button id="cprv">⏮</button><button id="cplay">▶ Играть</button><button id="cnxt">⏭</button><label class="hint" style="margin:0">FPS <input type="number" id="cfps" min="1" max="120" value="24"></label></div>
+</div>
 <div class="clist" id="clist"></div>
 <input type="text" id="cname" placeholder="Название листа" style="width:100%;margin-bottom:10px">
 <input type="text" id="cpre" placeholder="Префикс кадров (пусто — по именам файлов)" style="width:100%;margin-bottom:10px">
@@ -582,7 +590,7 @@ $('escale').addEventListener('change',function(){if(Object.keys(ADJ).length){ADJ
 
 /* ===== ready sprite sheet optimizer ===== */
 var OS={img:null,imgName:'',size:0,subs:[],anims:{},names:[]},otimer=null,opk=0;
-function tab(n){['tabA','tabB','tabC'].forEach(function(id,i){$(id).style.display=i===n?'block':'none'});['tA','tB','tC'].forEach(function(id,i){$(id).className=i===n?'p':''});stop();oStop()}
+function tab(n){cStop();['tabA','tabB','tabC'].forEach(function(id,i){$(id).style.display=i===n?'block':'none'});['tA','tB','tC'].forEach(function(id,i){$(id).className=i===n?'p':''});stop();oStop()}
 $('tA').addEventListener('click',function(){tab(0)});
 $('tB').addEventListener('click',function(){tab(1)});
 $('tC').addEventListener('click',function(){tab(2)});
@@ -633,6 +641,8 @@ $('oL').addEventListener('click',function(){oAdj(-1,0)});$('oR').addEventListene
 $('oU').addEventListener('click',function(){oAdj(0,-1)});$('oD').addEventListener('click',function(){oAdj(0,1)});
 $('orst').addEventListener('click',function(){var sc=$('oscope').value,l=oAnim();(sc==='frame'?[l[opk]]:sc==='anim'?l:OS.subs).forEach(function(b){if(b){b.dx=0;b.dy=0}});oDraw(opk)});
 $('osl').addEventListener('input',function(){oStop();oDraw(+this.value)});
+$('oprev').addEventListener('click',function(){oStop();var n=oAnim().length;if(n)oDraw((opk-1+n)%n)});
+$('onext').addEventListener('click',function(){oStop();var n=oAnim().length;if(n)oDraw((opk+1)%n)});
 $('oplay').addEventListener('click',function(){
  if(otimer){oStop();return}
  var f=Math.max(1,+$('ofps').value||24);$('oplay').textContent='⏸ Пауза';
@@ -716,18 +726,48 @@ function cRender(){
   var dn=document.createElement('button');dn.textContent='↓';dn.onclick=function(){if(i<CF.length-1){var t=CF[i+1];CF[i+1]=CF[i];CF[i]=t;cRender()}};
   [mn,n,pl,up,dn].forEach(function(e){l2.appendChild(e)});
   r.appendChild(l1);r.appendChild(l2);box.appendChild(r)});
- box.scrollTop=top
+ box.scrollTop=top;cPrev()
 }
 async function cThumbs(){
  var tok=++cTok;
- for(var i=0;i<CF.length;i++){var it=CF[i];if(it.thumb)continue;
+ for(var i=0;i<CF.length;i++){var it=CF[i];if(it.c1)continue;
   var img=await it.get();if(tok!==cTok)return;if(!img)continue;
-  var k=Math.min(1,80/img.naturalWidth,80/img.naturalHeight),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*k));c.height=Math.max(1,Math.round(img.naturalHeight*k));
-  c.getContext('2d').drawImage(img,0,0,c.width,c.height);it.thumb=c.toDataURL('image/png');
+  it.w=img.naturalWidth;it.h=img.naturalHeight;
+  var k=Math.min(1,400/it.w,400/it.h),c=document.createElement('canvas');c.width=Math.max(1,Math.round(it.w*k));c.height=Math.max(1,Math.round(it.h*k));
+  var cx=c.getContext('2d');cx.imageSmoothingQuality='high';cx.drawImage(img,0,0,c.width,c.height);it.c1=c;
+  var t=Math.min(1,80/c.width,80/c.height),tc=document.createElement('canvas');tc.width=Math.max(1,Math.round(c.width*t));tc.height=Math.max(1,Math.round(c.height*t));tc.getContext('2d').drawImage(c,0,0,tc.width,tc.height);it.thumb=tc.toDataURL('image/png');
   if(i%4===3){cRender();await tick()}}
  if(tok===cTok)cRender()
 }
-function cSet(list,def){CF=list.sort(nat);CF.forEach(function(it){it.rep=1});$('cname').value=def||'';cRender();cThumbs()}
+var ctimer=null,cpk=0;
+function cSeq(){var q=[];CF.forEach(function(it){for(var r=0;r<it.rep;r++)q.push(it)});return q}
+function cStop(){if(ctimer){clearInterval(ctimer);ctimer=null}$('cplay').textContent='▶ Играть'}
+function cPrev(){
+ var q=cSeq();$('cpbox').style.display=CF.length?'block':'none';if(!q.length){cStop();return}
+ $('cpsl').max=q.length-1;if(cpk>=q.length)cpk=0;cDraw(cpk)
+}
+function cDraw(k){
+ var q=cSeq();if(!q.length)return;cpk=k;var it=q[k];$('cpsl').value=k;
+ var s=+$('cl').value,mw=0,mh=0;q.forEach(function(x){if(x.c1){mw=Math.max(mw,x.c1.width);mh=Math.max(mh,x.c1.height)}});
+ if(!it.c1||!mw){$('cp1t').textContent='Загрузка кадров…';return}
+ var c1=$('cpv1');c1.width=mw;c1.height=mh;c1.getContext('2d').drawImage(it.c1,0,0);
+ var dw=Math.min(mw,Math.max(120,($('cpw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);c1.style.width=dw+'px';c1.style.height=dh+'px';c1.style.maxWidth='none';
+ var red=s<1;$('cpw2').style.display=red?'block':'none';$('cp2t').style.display=red?'block':'none';
+ $('cp1t').textContent='Кадр '+(k+1)+' из '+q.length+' · '+it.name+' · '+it.w+'×'+it.h;
+ if(red){var rw2=Math.max(1,Math.min(it.c1.width,Math.round(it.w*s))),rh2=Math.max(1,Math.min(it.c1.height,Math.round(it.h*s))),t=document.createElement('canvas');t.width=rw2;t.height=rh2;
+  var tx=t.getContext('2d');tx.imageSmoothingQuality='high';tx.drawImage(it.c1,0,0,rw2,rh2);
+  var c2=$('cpv2');c2.width=mw;c2.height=mh;c2.getContext('2d').drawImage(t,0,0,it.c1.width,it.c1.height);
+  c2.style.width=dw+'px';c2.style.height=dh+'px';c2.style.maxWidth='none';
+  $('cp2t').textContent='После уменьшения на '+Math.round((1-s)*100)+'%: '+Math.max(1,Math.round(it.w*s))+'×'+Math.max(1,Math.round(it.h*s))+' (растянуто до размера оригинала)'}
+}
+$('cl').addEventListener('change',function(){if(CF.length)cDraw(cpk)});
+$('cpsl').addEventListener('input',function(){cStop();cDraw(+this.value)});
+$('cprv').addEventListener('click',function(){cStop();var n=cSeq().length;if(n)cDraw((cpk-1+n)%n)});
+$('cnxt').addEventListener('click',function(){cStop();var n=cSeq().length;if(n)cDraw((cpk+1)%n)});
+function cPlay(){cStop();var n=cSeq().length;if(!n)return;$('cplay').textContent='⏸ Пауза';ctimer=setInterval(function(){cDraw((cpk+1)%cSeq().length)},1000/Math.max(1,+$('cfps').value||24))}
+$('cplay').addEventListener('click',function(){if(ctimer)cStop();else cPlay()});
+$('cfps').addEventListener('change',function(){if(ctimer)cPlay()});
+function cSet(list,def){cStop();cpk=0;CF=list.sort(nat);CF.forEach(function(it){it.rep=1});$('cname').value=def||'';cRender();cThumbs()}
 $('cf').addEventListener('change',function(e){
  var fl=[].slice.call(e.target.files).filter(function(f){return /\.png$/i.test(f.name)});e.target.value='';
  if(!fl.length){toast('Выбери PNG-файлы');return}
