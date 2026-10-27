@@ -143,7 +143,7 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <section id="os2" style="display:none">
 <h2>Предпросмотр и оптимизация</h2>
 <select id="oa"></select>
-<select id="ol"><option value="0.75">Уменьшить на 25% (размер 75%)</option><option value="0.5" selected>Уменьшить на 50% (размер 50%)</option><option value="0.25">Уменьшить на 75% (размер 25%)</option></select>
+<select id="ol"><option value="1">Оригинальное качество (без уменьшения, только позиция кадров)</option><option value="0.75">Уменьшить на 25% (размер 75%)</option><option value="0.5" selected>Уменьшить на 50% (размер 50%)</option><option value="0.25">Уменьшить на 75% (размер 25%)</option></select>
 <div class="hint" id="ot1" style="margin:0 0 4px"></div>
 <div class="pvw" id="opw"><canvas class="pv" id="opv1" width="1" height="1"></canvas></div>
 <div class="hint" id="ot2" style="margin:0 0 4px"></div>
@@ -173,6 +173,15 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="pvw" id="cpw2" style="display:none"><canvas class="pv" id="cpv2" width="1" height="1"></canvas></div>
 <input type="range" id="cpsl" min="0" max="0" value="0" style="width:100%;margin-bottom:6px">
 <div class="row"><button id="cprv">⏮</button><button id="cplay">▶ Играть</button><button id="cnxt">⏭</button><label class="hint" style="margin:0">FPS <input type="number" id="cfps" min="1" max="120" value="24"></label></div>
+<h2 style="margin:14px 0 8px">Корректировка frameX / frameY</h2>
+<div class="hint" id="cval" style="margin:0 0 6px"></div>
+<div class="row" style="justify-content:center"><button id="cL">◀</button><button id="cU">▲</button><button id="cD">▼</button><button id="cR">▶</button></div>
+<select id="cscope"><option value="frame">Применять: только к этому кадру последовательности</option><option value="src">Применять: ко всем повторам этого кадра</option><option value="all">Применять: ко всем кадрам</option></select>
+<div class="row"><button id="cradj">Сбросить корректировку</button></div>
+</div>
+<div id="cedit" style="display:none">
+<div class="row"><span class="hint" style="margin:0">Повторить кадры с</span><input type="number" id="crf" min="1" value="1" style="width:68px"><span class="hint" style="margin:0">по</span><input type="number" id="crt" min="1" value="1" style="width:68px"><span class="hint" style="margin:0">ещё</span><input type="number" id="crn" min="1" value="1" style="width:68px"><span class="hint" style="margin:0">раз</span><button id="crb">Повторить</button></div>
+<div class="row"><button id="crst">Сбросить порядок и повторы</button></div>
 </div>
 <div class="clist" id="clist"></div>
 <input type="text" id="cname" placeholder="Название листа" style="width:100%;margin-bottom:10px">
@@ -456,14 +465,14 @@ function doExport(zip){
  if(!ks.length){toast('Нет кадров для сохранения');return}
  var mode=$('mode').value,MD=anim.MD||{},B=fitBox(),sc=+$('escale').value||1,i=0,safe=cur.n.replace(/[^\w\-]+/g,'_'),files=[];
  var bgc=($('bgx').checked&&$('bgs').value!=='chk')?$('bgs').value:null;
- var mgn=0;ks.forEach(function(q){var a=ADJ[cur.i+q];if(a)mgn=Math.max(mgn,Math.abs(a.x||0),Math.abs(a.y||0))});
+ var cntL={},mgn=0;ks.forEach(function(q){var a=ADJ[cur.i+q];if(a)mgn=Math.max(mgn,Math.abs(a.x||0),Math.abs(a.y||0))});
  $('exp').disabled=$('expz').disabled=true;
  function done(){$('exp').disabled=$('expz').disabled=false}
  function next(){
   if(i>=ks.length){
-   if(zip){return saveFile(safe+'_frames.zip',makeZip(files)).then(function(){done();$('einfo').textContent='ZIP сохранён ('+ks.length+' кадров): '+where(safe+'_frames.zip');toast('Готово: ZIP, '+ks.length+' PNG')})}
+   if(zip){return saveFile((cur.n==='timeline'&&folderName?folderName.replace(/[\\\/:*?"<>|]+/g,'_'):safe)+'_frames.zip',makeZip(files)).then(function(){done();$('einfo').textContent='ZIP сохранён ('+ks.length+' кадров): '+where(safe+'_frames.zip');toast('Готово: ZIP, '+ks.length+' PNG')})}
    done();$('einfo').textContent='Сохранено PNG: '+ks.length+'. '+where('');toast('Готово: '+ks.length+' PNG');return Promise.resolve()}
-  var num=$('ren').checked?i:ks[i];var kk=ks[i++],list=opsAt(cur.i+kk),r;
+  var kk=ks[i],num=$('ren').checked?i:kk,pfx=safe;if(cur.n==='timeline'){var tt=cur.i+kk,sg=segOf(tt);if(sg>0){pfx=LB[sg].n.replace(/[^\w\-]+/g,'_');if($('ren').checked){num=cntL[pfx]||0;cntL[pfx]=num+1}else num=tt-LB[sg].i}}i++;var list=opsAt(cur.i+kk),r;
   if(mode==='scene')r={x:0,y:0,w:MD.W||1280,h:MD.H||720};
   else if(mode==='each'){var b=boundsOf(list,null)||[0,0,1,1];r={x:Math.floor(b[0]),y:Math.floor(b[1]),w:Math.max(1,Math.ceil(b[2])-Math.floor(b[0])),h:Math.max(1,Math.ceil(b[3])-Math.floor(b[1]))}}
   else r=B;
@@ -473,7 +482,7 @@ function doExport(zip){
   if(bgc){x.fillStyle=bgc;x.fillRect(0,0,W,H)}
   drawOps(x,list,sc,-r.x*sc+mgn+ax,-r.y*sc+mgn+ay);
   $('einfo').textContent=(zip?'Собираю ':'Сохраняю ')+i+' из '+ks.length+'…';
-  var name=safe+String(num).padStart(4,'0')+'.png';
+  var name=pfx+String(num).padStart(4,'0')+'.png';
   return new Promise(function(res){c.toBlob(res,'image/png')}).then(function(bl){
    if(zip)return new Response(bl).arrayBuffer().then(function(ab){files.push({name:name,data:new Uint8Array(ab)})}).then(next);
    return saveFile(name,bl).then(next)})
@@ -670,6 +679,18 @@ async function oBuild(){
  var btn=$('obuild'),inf=$('oinfo');
  if(!OS.img||!OS.subs.length){toast('Сначала загрузи PNG и XML листа');return}
  var s=+$('ol').value,pad=2,pieces={},P=[],i,pct=Math.round((1-s)*100);
+ if(s===1){
+  try{
+   btn.disabled=true;var base=OS.imgName.replace(/\.png$/i,''),out=base+'_fixed';
+   var xml1='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+escX(OS.imgName)+'">\n';
+   OS.subs.forEach(function(sb){var d=oDims(sb,1);xml1+='\t<SubTexture name="'+escX(sb.name)+'" x="'+sb.x+'" y="'+sb.y+'" width="'+sb.w+'" height="'+sb.h+'" frameX="'+(-d.x0)+'" frameY="'+(-d.y0)+'" frameWidth="'+d.FW+'" frameHeight="'+d.FH+'"/>\n'});
+   xml1+='</TextureAtlas>\n';var w1;
+   if(NATIVE){await saveFile(out+'.xml',new Blob([xml1],{type:'application/xml'}));w1=where('')}
+   else{await saveFile(out+'_xml.zip',makeZip([{name:out+'.xml',data:new TextEncoder().encode(xml1)}]));w1=where(out+'_xml.zip')+' (внутри ZIP лежит '+out+'.xml)'}
+   inf.textContent='Сохранён только XML: '+out+'.xml (PNG не менялся и остаётся '+OS.imgName+'). Сохранено: '+w1;toast('Готово: XML с исправленными позициями')
+  }catch(e){inf.textContent='';failMsg(e)}
+  btn.disabled=false;return
+ }
  try{
   btn.disabled=true;
   OS.subs.forEach(function(sb){var key=[sb.x,sb.y,sb.w,sb.h,sb.fx,sb.fy].join(',');if(!pieces[key]){pieces[key]={sb:sb,d:oDims(sb,s)};P.push(pieces[key])}sb.key=key});
@@ -703,28 +724,27 @@ async function oBuild(){
 }
 $('obuild').addEventListener('click',oBuild);
 /* ===== sheet from separate PNG frames ===== */
-var CF=[],cTok=0;
+var CF=[],SEQ=[],cTok=0;
 function nat(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true})}
-function cSeqLen(){var n=0;CF.forEach(function(it){n+=it.rep});return n}
 function cDefName(){var n=(CF[0]&&CF[0].name)||'';n=n.replace(/[\d_\-\s]+$/,'');return n||'spritesheet'}
 function cRender(){
  var box=$('clist'),top=box.scrollTop;box.innerHTML='';
  $('cchips').innerHTML=CF.length?'<span class="chip ok">PNG-кадров: '+CF.length+'</span>':'';
- $('ccount').textContent=CF.length?'Кадров в анимации с учётом повторов: '+cSeqLen():'';
- CF.forEach(function(it,i){
-  var r=document.createElement('div');r.className='cr';
+ $('ccount').textContent=CF.length?'Кадров в анимации: '+SEQ.length:'';
+ $('cedit').style.display=CF.length?'block':'none';
+ SEQ.forEach(function(e,i){
+  var it=e.it,r=document.createElement('div');r.className='cr';
   var l1=document.createElement('div');l1.className='l1';
   var im=document.createElement('img');im.alt='';if(it.thumb)im.src=it.thumb;
-  var nm=document.createElement('span');nm.className='nm';nm.textContent=it.name;
-  var rm=document.createElement('button');rm.textContent='✕';rm.onclick=function(){CF.splice(i,1);cRender()};
-  l1.appendChild(im);l1.appendChild(nm);l1.appendChild(rm);
+  var nm=document.createElement('span');nm.className='nm';nm.textContent=(i+1)+'. '+it.name;
+  var cp=document.createElement('button');cp.textContent='⧉';cp.onclick=function(){SEQ.splice(i+1,0,{it:it,dx:e.dx,dy:e.dy});cRender()};
+  var rm=document.createElement('button');rm.textContent='✕';rm.onclick=function(){SEQ.splice(i,1);cRender()};
+  [im,nm,cp,rm].forEach(function(x){l1.appendChild(x)});
   var l2=document.createElement('div');l2.className='l2';
-  var mn=document.createElement('button');mn.textContent='−';mn.onclick=function(){if(it.rep>1){it.rep--;cRender()}};
-  var n=document.createElement('span');n.className='n';n.textContent='×'+it.rep;
-  var pl=document.createElement('button');pl.textContent='+';pl.onclick=function(){it.rep++;cRender()};
-  var up=document.createElement('button');up.textContent='↑';up.onclick=function(){if(i>0){var t=CF[i-1];CF[i-1]=CF[i];CF[i]=t;cRender()}};
-  var dn=document.createElement('button');dn.textContent='↓';dn.onclick=function(){if(i<CF.length-1){var t=CF[i+1];CF[i+1]=CF[i];CF[i]=t;cRender()}};
-  [mn,n,pl,up,dn].forEach(function(e){l2.appendChild(e)});
+  var up=document.createElement('button');up.textContent='↑';up.onclick=function(){if(i>0){var t=SEQ[i-1];SEQ[i-1]=SEQ[i];SEQ[i]=t;cRender()}};
+  var dn=document.createElement('button');dn.textContent='↓';dn.onclick=function(){if(i<SEQ.length-1){var t=SEQ[i+1];SEQ[i+1]=SEQ[i];SEQ[i]=t;cRender()}};
+  var pv=document.createElement('button');pv.textContent='👁';pv.onclick=function(){cStop();cDraw(i);$('cpbox').scrollIntoView()};
+  [up,dn,pv].forEach(function(x){l2.appendChild(x)});
   r.appendChild(l1);r.appendChild(l2);box.appendChild(r)});
  box.scrollTop=top;cPrev()
 }
@@ -740,34 +760,45 @@ async function cThumbs(){
  if(tok===cTok)cRender()
 }
 var ctimer=null,cpk=0;
-function cSeq(){var q=[];CF.forEach(function(it){for(var r=0;r<it.rep;r++)q.push(it)});return q}
 function cStop(){if(ctimer){clearInterval(ctimer);ctimer=null}$('cplay').textContent='▶ Играть'}
 function cPrev(){
- var q=cSeq();$('cpbox').style.display=CF.length?'block':'none';if(!q.length){cStop();return}
- $('cpsl').max=q.length-1;if(cpk>=q.length)cpk=0;cDraw(cpk)
+ $('cpbox').style.display=CF.length?'block':'none';if(!SEQ.length){cStop();return}
+ $('cpsl').max=SEQ.length-1;if(cpk>=SEQ.length)cpk=0;cDraw(cpk)
 }
 function cDraw(k){
- var q=cSeq();if(!q.length)return;cpk=k;var it=q[k];$('cpsl').value=k;
- var s=+$('cl').value,mw=0,mh=0;q.forEach(function(x){if(x.c1){mw=Math.max(mw,x.c1.width);mh=Math.max(mh,x.c1.height)}});
+ if(!SEQ.length)return;cpk=k;var e=SEQ[k],it=e.it;$('cpsl').value=k;
+ var s=+$('cl').value,mw=0,mh=0;SEQ.forEach(function(x){if(x.it.c1){mw=Math.max(mw,x.it.c1.width);mh=Math.max(mh,x.it.c1.height)}});
  if(!it.c1||!mw){$('cp1t').textContent='Загрузка кадров…';return}
  var c1=$('cpv1');c1.width=mw;c1.height=mh;c1.getContext('2d').drawImage(it.c1,0,0);
  var dw=Math.min(mw,Math.max(120,($('cpw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);c1.style.width=dw+'px';c1.style.height=dh+'px';c1.style.maxWidth='none';
- var red=s<1;$('cpw2').style.display=red?'block':'none';$('cp2t').style.display=red?'block':'none';
- $('cp1t').textContent='Кадр '+(k+1)+' из '+q.length+' · '+it.name+' · '+it.w+'×'+it.h;
- if(red){var rw2=Math.max(1,Math.min(it.c1.width,Math.round(it.w*s))),rh2=Math.max(1,Math.min(it.c1.height,Math.round(it.h*s))),t=document.createElement('canvas');t.width=rw2;t.height=rh2;
+ var show=s<1||e.dx||e.dy;$('cpw2').style.display=show?'block':'none';$('cp2t').style.display=show?'block':'none';
+ $('cp1t').textContent='Кадр '+(k+1)+' из '+SEQ.length+' · '+it.name+' · '+it.w+'×'+it.h;
+ $('cval').textContent='Кадр '+(k+1)+': сдвиг '+e.dx+', '+e.dy+' px (в размере листа)';
+ if(show){var rw2=Math.max(1,Math.min(it.c1.width,Math.round(it.w*s))),rh2=Math.max(1,Math.min(it.c1.height,Math.round(it.h*s))),t=document.createElement('canvas');t.width=rw2;t.height=rh2;
   var tx=t.getContext('2d');tx.imageSmoothingQuality='high';tx.drawImage(it.c1,0,0,rw2,rh2);
-  var c2=$('cpv2');c2.width=mw;c2.height=mh;c2.getContext('2d').drawImage(t,0,0,it.c1.width,it.c1.height);
+  var ps=(it.c1.width/it.w)/s,c2=$('cpv2');c2.width=mw;c2.height=mh;c2.getContext('2d').drawImage(t,e.dx*ps,e.dy*ps,it.c1.width,it.c1.height);
   c2.style.width=dw+'px';c2.style.height=dh+'px';c2.style.maxWidth='none';
-  $('cp2t').textContent='После уменьшения на '+Math.round((1-s)*100)+'%: '+Math.max(1,Math.round(it.w*s))+'×'+Math.max(1,Math.round(it.h*s))+' (растянуто до размера оригинала)'}
+  $('cp2t').textContent='Результат (уменьшение на '+Math.round((1-s)*100)+'%): '+Math.max(1,Math.round(it.w*s))+'×'+Math.max(1,Math.round(it.h*s))+(s<1?', растянуто до размера оригинала':'')}
 }
-$('cl').addEventListener('change',function(){if(CF.length)cDraw(cpk)});
+$('cl').addEventListener('change',function(){var any=SEQ.some(function(e){return e.dx||e.dy});SEQ.forEach(function(e){e.dx=0;e.dy=0});if(any)toast('Корректировка сброшена: размер кадров изменён');if(SEQ.length)cDraw(cpk)});
 $('cpsl').addEventListener('input',function(){cStop();cDraw(+this.value)});
-$('cprv').addEventListener('click',function(){cStop();var n=cSeq().length;if(n)cDraw((cpk-1+n)%n)});
-$('cnxt').addEventListener('click',function(){cStop();var n=cSeq().length;if(n)cDraw((cpk+1)%n)});
-function cPlay(){cStop();var n=cSeq().length;if(!n)return;$('cplay').textContent='⏸ Пауза';ctimer=setInterval(function(){cDraw((cpk+1)%cSeq().length)},1000/Math.max(1,+$('cfps').value||24))}
+$('cprv').addEventListener('click',function(){cStop();var n=SEQ.length;if(n)cDraw((cpk-1+n)%n)});
+$('cnxt').addEventListener('click',function(){cStop();var n=SEQ.length;if(n)cDraw((cpk+1)%n)});
+function cPlay(){cStop();if(!SEQ.length)return;$('cplay').textContent='⏸ Пауза';ctimer=setInterval(function(){cDraw((cpk+1)%SEQ.length)},1000/Math.max(1,+$('cfps').value||24))}
 $('cplay').addEventListener('click',function(){if(ctimer)cStop();else cPlay()});
 $('cfps').addEventListener('change',function(){if(ctimer)cPlay()});
-function cSet(list,def){cStop();cpk=0;CF=list.sort(nat);CF.forEach(function(it){it.rep=1});$('cname').value=def||'';cRender();cThumbs()}
+function cAdj(dx,dy){var sc=$('cscope').value,e=SEQ[cpk];if(!e)return;SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&x.it===e.it)||x===e){x.dx+=dx;x.dy+=dy}});cDraw(cpk)}
+$('cL').addEventListener('click',function(){cAdj(-1,0)});$('cR').addEventListener('click',function(){cAdj(1,0)});
+$('cU').addEventListener('click',function(){cAdj(0,-1)});$('cD').addEventListener('click',function(){cAdj(0,1)});
+$('cradj').addEventListener('click',function(){var sc=$('cscope').value,e=SEQ[cpk];SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&e&&x.it===e.it)||x===e){x.dx=0;x.dy=0}});cDraw(cpk)});
+$('crb').addEventListener('click',function(){
+ var f=Math.max(1,+$('crf').value||1),t=Math.min(SEQ.length,+$('crt').value||1),n=Math.max(1,+$('crn').value||1);
+ if(!SEQ.length||f>t){toast('Проверь номера кадров');return}
+ var chunk=SEQ.slice(f-1,t),ins=[];for(var r=0;r<n;r++)chunk.forEach(function(e){ins.push({it:e.it,dx:e.dx,dy:e.dy})});
+ [].splice.apply(SEQ,[t,0].concat(ins));cRender();toast('Добавлено кадров: '+ins.length)
+});
+$('crst').addEventListener('click',function(){SEQ=CF.map(function(it){return{it:it,dx:0,dy:0}});cpk=0;cRender()});
+function cSet(list,def){cStop();cpk=0;CF=list.sort(nat);SEQ=CF.map(function(it){return{it:it,dx:0,dy:0}});$('cname').value=def||'';cRender();cThumbs()}
 $('cf').addEventListener('change',function(e){
  var fl=[].slice.call(e.target.files).filter(function(f){return /\.png$/i.test(f.name)});e.target.value='';
  if(!fl.length){toast('Выбери PNG-файлы');return}
@@ -784,19 +815,20 @@ if(NATIVE){$('cfb').style.display='inline-block';$('cfb').addEventListener('clic
 function fnv(d){var h1=2166136261,h2=5381,u=new Uint32Array(d.buffer,d.byteOffset,d.length>>2);for(var i=0;i<u.length;i++){var v=u[i];h1=Math.imul(h1^v,16777619)>>>0;h2=(Math.imul(h2,33)^v)>>>0}return h1+'.'+h2}
 async function cBuild(){
  var btn=$('cbuild'),inf=$('cinfo');
- if(!CF.length){toast('Сначала выбери PNG-кадры');return}
- var s=+$('cl').value,trim=$('ctrim').checked,dd=$('cdup').checked,pad=2,items=[],seen={},U=[],i;
+ if(!SEQ.length){toast('Сначала выбери PNG-кадры');return}
+ var s=+$('cl').value,trim=$('ctrim').checked,dd=$('cdup').checked,pad=2,seen={},U=[],used=[],i;
+ SEQ.forEach(function(e){if(used.indexOf(e.it)<0)used.push(e.it)});
  try{
   btn.disabled=true;
-  for(i=0;i<CF.length;i++){
-   var img=await CF[i].get();if(!img){inf.textContent='Не удалось открыть '+CF[i].name+'.png';btn.disabled=false;return}
+  for(i=0;i<used.length;i++){
+   var src=used[i],img=await src.get();if(!img){inf.textContent='Не удалось открыть '+src.name+'.png';btn.disabled=false;return}
    var W=Math.max(1,Math.round(img.naturalWidth*s)),H=Math.max(1,Math.round(img.naturalHeight*s)),c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
    x.imageSmoothingQuality='high';x.drawImage(img,0,0,W,H);
    var t=trim?trimBox(c):{x:0,y:0,w:W,h:H},pc=document.createElement('canvas');pc.width=t.w;pc.height=t.h;pc.getContext('2d').drawImage(c,t.x,t.y,t.w,t.h,0,0,t.w,t.h);
-   var key=dd?(t.w+'x'+t.h+':'+fnv(pc.getContext('2d').getImageData(0,0,t.w,t.h).data)):null,it={name:CF[i].name,rep:CF[i].rep,t:t,FW:W,FH:H};
-   if(key&&seen[key]!==undefined)it.ref=seen[key];else{it.pc=pc;if(key)seen[key]=items.length;U.push(it)}
-   items.push(it);c.width=c.height=1;
-   inf.textContent='Обработка кадров: '+(i+1)+' из '+CF.length;await tick()}
+   var key=dd?(t.w+'x'+t.h+':'+fnv(pc.getContext('2d').getImageData(0,0,t.w,t.h).data)):null,pr={name:src.name,t:t,FW:W,FH:H};
+   if(key&&seen[key])pr.ref=seen[key];else{pr.pc=pc;if(key)seen[key]=pr;U.push(pr)}
+   src.pr=pr;c.width=c.height=1;
+   inf.textContent='Обработка кадров: '+(i+1)+' из '+used.length;await tick()}
   var ar=0,mw=0;U.forEach(function(it){ar+=(it.t.w+pad)*(it.t.h+pad);mw=Math.max(mw,it.t.w+2*pad)});
   var maxW=Math.max(mw,Math.ceil(Math.sqrt(ar)));
   U.sort(function(a,b){return b.t.h-a.t.h});
@@ -806,17 +838,16 @@ async function cBuild(){
   if(SW>16384||SH>16384){toast('Лист получился больше 16384 px');inf.textContent='';btn.disabled=false;return}
   var sh=document.createElement('canvas');sh.width=SW;sh.height=SH;var sx=sh.getContext('2d');
   U.forEach(function(it){sx.drawImage(it.pc,it.px,it.py);it.pc=null});
-  var name=($('cname').value||'spritesheet').replace(/[\\\/:*?"<>|]+/g,'_').trim()||'spritesheet',pre=$('cpre').value.trim(),cnt={},total=0;
+  var name=($('cname').value||'spritesheet').replace(/[\\\/:*?"<>|]+/g,'_').trim()||'spritesheet',pre=$('cpre').value.trim(),cnt={};
   var xml='<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="'+escX(name)+'.png">\n';
-  items.forEach(function(it){var r=it.ref!==undefined?items[it.ref]:it,base=pre||it.name.replace(/\d+$/,'')||'frame';
-   for(var q=0;q<it.rep;q++){var idx=cnt[base]||0;cnt[base]=idx+1;total++;
-    xml+='\t<SubTexture name="'+escX(base+String(idx).padStart(4,'0'))+'" x="'+r.px+'" y="'+r.py+'" width="'+r.t.w+'" height="'+r.t.h+'" frameX="'+(-r.t.x)+'" frameY="'+(-r.t.y)+'" frameWidth="'+r.FW+'" frameHeight="'+r.FH+'"/>\n'}});
+  SEQ.forEach(function(e){var pr=e.it.pr,r=pr.ref||pr,base=pre||e.it.name.replace(/\d+$/,'')||'frame',idx=cnt[base]||0;cnt[base]=idx+1;
+   xml+='\t<SubTexture name="'+escX(base+String(idx).padStart(4,'0'))+'" x="'+r.px+'" y="'+r.py+'" width="'+r.t.w+'" height="'+r.t.h+'" frameX="'+(-(r.t.x+e.dx))+'" frameY="'+(-(r.t.y+e.dy))+'" frameWidth="'+Math.max(r.FW,r.t.x+e.dx+r.t.w)+'" frameHeight="'+Math.max(r.FH,r.t.y+e.dy+r.t.h)+'"/>\n'});
   xml+='</TextureAtlas>\n';
   inf.textContent='Сжатие PNG…';await tick();
   var png=null;try{png=await encodePng(sh,function(a,b){inf.textContent='Сжатие PNG: '+Math.round(a*100/b)+'%'})}catch(e){png=null}
   if(!png)png=await new Promise(function(res){sh.toBlob(res,'image/png')});
   if(!png){inf.textContent='Браузеру не хватило памяти на такой лист.';btn.disabled=false;return}
-  var msg='Лист '+SW+'×'+SH+' ('+(png.size/1048576).toFixed(1)+' МБ), кадров в XML: '+total+', уникальных в PNG: '+U.length,w;
+  var msg='Лист '+SW+'×'+SH+' ('+(png.size/1048576).toFixed(1)+' МБ), кадров в XML: '+SEQ.length+', уникальных в PNG: '+U.length,w;
   inf.textContent='Сохраняю…';
   if(NATIVE){await saveFile(name+'.png',png);await saveFile(name+'.xml',new Blob([xml],{type:'application/xml'}));w=where('')}
   else{var ab=await new Response(png).arrayBuffer();await saveFile(name+'_sheet.zip',makeZip([{name:name+'.png',data:new Uint8Array(ab)},{name:name+'.xml',data:new TextEncoder().encode(xml)}]));w=where(name+'_sheet.zip')+' (внутри ZIP лежат '+name+'.png и '+name+'.xml)'}
