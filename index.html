@@ -289,7 +289,8 @@ function refresh(){
 }
 
 /* ---------- animations ---------- */
-function labels(){var o=[];layersOf(MAIN).forEach(function(L){(L.FR||[]).forEach(function(f){if(f.N)o.push({n:f.N,i:f.I,du:f.DU})})});
+function labels(){var o=[],seen={};layersOf(MAIN).forEach(function(L){(L.FR||[]).forEach(function(f){if(!f.N)return;var key=f.N+'@'+f.I,e=seen[key];if(e){e.du=Math.max(e.du,f.DU);return}e={n:f.N,i:f.I,du:f.DU};seen[key]=e;o.push(e)})});
+ o.sort(function(a,b){return a.i-b.i});
  o.unshift({n:'timeline',t:'Весь таймлайн',i:0,du:tlLen(MAIN)});return o}
 var LB=[],li=0,gs={},EXC={};
 function ct(k){return cur.map?cur.map[k]:cur.i+k}
