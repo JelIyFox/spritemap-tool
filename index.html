@@ -167,6 +167,8 @@ textarea{width:100%;height:260px;font:12px/1.35 ui-monospace,monospace;color:var
 <div class="chips" id="cchips"></div>
 <div class="hint" id="ccount" style="margin:8px 0"></div>
 <div id="cpbox" style="display:none">
+<select id="cpa" style="display:none"></select>
+<label class="row"><input type="checkbox" id="ccmp" checked> <span>Показывать оригинал для сравнения качества</span></label>
 <div class="hint" id="cp1t" style="margin:0 0 4px"></div>
 <div class="pvw" id="cpw"><canvas class="pv" id="cpv1" width="1" height="1"></canvas></div>
 <div class="hint" id="cp2t" style="margin:0 0 4px;display:none"></div>
@@ -620,13 +622,15 @@ function oIngest(img,imgName,size,xml){
   if(n.getAttribute('rotated')==='true'){toast('Повёрнутые кадры в этом листе не поддерживаются');return false}
   subs.push({name:n.getAttribute('name')||('frame'+i),x:g('x'),y:g('y'),w:g('width'),h:g('height'),fx:g('frameX')||0,fy:g('frameY')||0,fw:g('frameWidth'),fh:g('frameHeight')})}
  OS.img=img;OS.imgName=imgName;OS.size=size;OS.subs=subs;OS.anims={};OS.names=[];
- subs.forEach(function(sb,i){var m=/^(.*?)(\d{4})$/.exec(sb.name)||/^(.*?)(\d+)$/.exec(sb.name),base=m&&m[1]?m[1]:(m?'кадры':sb.name),idx=m?parseInt(m[2],10):i;sb.idx=idx;(OS.anims[base]=OS.anims[base]||[]).push(sb)});
+ subs.forEach(function(sb,i){var m=/^(.*?)(\d{4})$/.exec(sb.name)||/^(.*?)(\d+)$/.exec(sb.name),base=m&&m[1]?m[1]:(m?'кадры':sb.name),idx=m?parseInt(m[2],10):i;sb.idx=idx;sb.an=base;(OS.anims[base]=OS.anims[base]||[]).push(sb)});
  OS.names=Object.keys(OS.anims);OS.names.forEach(function(k){OS.anims[k].sort(function(a,b){return a.idx-b.idx})});
- var sel=$('oa');sel.innerHTML='';OS.names.forEach(function(k,i){var o=document.createElement('option');o.value=i;o.textContent=k+' ('+OS.anims[k].length+' кадр.)';sel.appendChild(o)});
+ OS.all=[];OS.names.forEach(function(k){OS.all=OS.all.concat(OS.anims[k])});
+ var sel=$('oa');sel.innerHTML='';if(OS.names.length>1){var o0=document.createElement('option');o0.value='all';o0.textContent='Все анимации подряд ('+subs.length+' кадр.)';sel.appendChild(o0)}
+ OS.names.forEach(function(k,i){var o=document.createElement('option');o.value=i;o.textContent=k+' ('+OS.anims[k].length+' кадр.)';sel.appendChild(o)});
  $('ochips').innerHTML='<span class="chip ok">'+escX(imgName)+' · '+img.naturalWidth+'×'+img.naturalHeight+'</span><span class="chip ok">кадров в XML: '+subs.length+'</span>';
  $('os2').style.display='block';oPick();return true
 }
-function oAnim(){return OS.anims[OS.names[$('oa').value|0]]||[]}
+function oAnim(){var v=$('oa').value;if(v==='all')return OS.all||[];return OS.anims[OS.names[v|0]]||[]}
 function oFrame(sb,s,noadj){var d=oDims(sb,s,noadj),c=document.createElement('canvas');c.width=d.FW;c.height=d.FH;var x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(OS.img,sb.x,sb.y,sb.w,sb.h,d.x0,d.y0,d.w,d.h);return c}
 function oPick(){oStop();var l=oAnim();$('osl').max=Math.max(0,l.length-1);oDraw(0)}
 function oDraw(k){
@@ -639,7 +643,7 @@ function oDraw(k){
  var dw=Math.min(mw,Math.max(120,($('opw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);
  [c1,c2].forEach(function(c){c.style.width=dw+'px';c.style.height=dh+'px';c.style.maxWidth='none'});
  var pct=Math.round((1-s)*100);
- $('ot1').textContent='Оригинал: '+mw+'×'+mh;$('ot2').textContent='После уменьшения на '+pct+'%: '+rw+'×'+rh+' (растянуто до размера оригинала, чтобы видеть потерю качества)';
+ $('ot1').textContent='Оригинал: '+mw+'×'+mh+' · '+(sb.an||sb.name)+' · кадр '+(k+1)+' из '+l.length;$('ot2').textContent='После уменьшения на '+pct+'%: '+rw+'×'+rh+' (растянуто до размера оригинала, чтобы видеть потерю качества)';
  $('osl').value=k
 }
 function oStop(){if(otimer){clearInterval(otimer);otimer=null}$('oplay').textContent='▶ Играть'}
@@ -732,6 +736,10 @@ function cRender(){
  $('cchips').innerHTML=CF.length?'<span class="chip ok">PNG-кадров: '+CF.length+'</span>':'';
  $('ccount').textContent=CF.length?'Кадров в анимации: '+SEQ.length:'';
  $('cedit').style.display=CF.length?'block':'none';
+ var gs=[];CF.forEach(function(it){var g=cGroup(it);if(gs.indexOf(g)<0)gs.push(g)});
+ var pa=$('cpa'),pv0=pa.value;pa.innerHTML='';var o0=document.createElement('option');o0.value='all';o0.textContent='Просмотр: все кадры подряд ('+SEQ.length+')';pa.appendChild(o0);
+ gs.forEach(function(g){var n=SEQ.filter(function(e){return cGroup(e.it)===g}).length,o=document.createElement('option');o.value=g;o.textContent='Просмотр: '+g+' ('+n+' кадр.)';pa.appendChild(o)});
+ pa.value=(pv0&&gs.indexOf(pv0)>=0)?pv0:'all';pa.style.display=gs.length>1?'block':'none';
  SEQ.forEach(function(e,i){
   var it=e.it,r=document.createElement('div');r.className='cr';
   var l1=document.createElement('div');l1.className='l1';
@@ -743,7 +751,7 @@ function cRender(){
   var l2=document.createElement('div');l2.className='l2';
   var up=document.createElement('button');up.textContent='↑';up.onclick=function(){if(i>0){var t=SEQ[i-1];SEQ[i-1]=SEQ[i];SEQ[i]=t;cRender()}};
   var dn=document.createElement('button');dn.textContent='↓';dn.onclick=function(){if(i<SEQ.length-1){var t=SEQ[i+1];SEQ[i+1]=SEQ[i];SEQ[i]=t;cRender()}};
-  var pv=document.createElement('button');pv.textContent='👁';pv.onclick=function(){cStop();cDraw(i);$('cpbox').scrollIntoView()};
+  var pv=document.createElement('button');pv.textContent='👁';pv.onclick=function(){cStop();cShow(i);$('cpbox').scrollIntoView()};
   [up,dn,pv].forEach(function(x){l2.appendChild(x)});
   r.appendChild(l1);r.appendChild(l2);box.appendChild(r)});
  box.scrollTop=top;cPrev()
@@ -761,36 +769,46 @@ async function cThumbs(){
 }
 var ctimer=null,cpk=0;
 function cStop(){if(ctimer){clearInterval(ctimer);ctimer=null}$('cplay').textContent='▶ Играть'}
+function cGroup(it){return it.name.replace(/\d+$/,'')||'кадры'}
+function cView(){var g=$('cpa').value,v=[];SEQ.forEach(function(e,i){if(!g||g==='all'||cGroup(e.it)===g)v.push(i)});return v}
+function cShow(i){var g=cGroup(SEQ[i].it),pa=$('cpa');if(pa.value!=='all'&&pa.value!==g)pa.value=g;var j=cView().indexOf(i);cDraw(j<0?0:j)}
 function cPrev(){
- $('cpbox').style.display=CF.length?'block':'none';if(!SEQ.length){cStop();return}
- $('cpsl').max=SEQ.length-1;if(cpk>=SEQ.length)cpk=0;cDraw(cpk)
+ $('cpbox').style.display=CF.length?'block':'none';var v=cView();if(!v.length){cStop();return}
+ $('cpsl').max=v.length-1;if(cpk>=v.length)cpk=0;cDraw(cpk)
 }
-function cDraw(k){
- if(!SEQ.length)return;cpk=k;var e=SEQ[k],it=e.it;$('cpsl').value=k;
- var s=+$('cl').value,mw=0,mh=0;SEQ.forEach(function(x){if(x.it.c1){mw=Math.max(mw,x.it.c1.width);mh=Math.max(mh,x.it.c1.height)}});
+function cDraw(j){
+ var v=cView();if(!v.length)return;if(j>=v.length)j=0;cpk=j;var si=v[j],e=SEQ[si],it=e.it;$('cpsl').value=j;
+ var s=+$('cl').value,mw=0,mh=0,m=0;
+ SEQ.forEach(function(x){if(x.it.c1){mw=Math.max(mw,x.it.c1.width);mh=Math.max(mh,x.it.c1.height)}});
  if(!it.c1||!mw){$('cp1t').textContent='Загрузка кадров…';return}
- var c1=$('cpv1');c1.width=mw;c1.height=mh;c1.getContext('2d').drawImage(it.c1,0,0);
- var dw=Math.min(mw,Math.max(120,($('cpw').clientWidth||320)-6)),dh=Math.round(dw*mh/mw);c1.style.width=dw+'px';c1.style.height=dh+'px';c1.style.maxWidth='none';
- var show=s<1||e.dx||e.dy;$('cpw2').style.display=show?'block':'none';$('cp2t').style.display=show?'block':'none';
- $('cp1t').textContent='Кадр '+(k+1)+' из '+SEQ.length+' · '+it.name+' · '+it.w+'×'+it.h;
- $('cval').textContent='Кадр '+(k+1)+': сдвиг '+e.dx+', '+e.dy+' px (в размере листа)';
- if(show){var rw2=Math.max(1,Math.min(it.c1.width,Math.round(it.w*s))),rh2=Math.max(1,Math.min(it.c1.height,Math.round(it.h*s))),t=document.createElement('canvas');t.width=rw2;t.height=rh2;
+ SEQ.forEach(function(x){if(x.it.c1&&(x.dx||x.dy)){var q=(x.it.c1.width/x.it.w)/s;m=Math.max(m,Math.ceil(Math.max(Math.abs(x.dx),Math.abs(x.dy))*q))}});
+ var ps=(it.c1.width/it.w)/s,rw=mw+2*m,rh=mh+2*m,c1=$('cpv1');c1.width=rw;c1.height=rh;
+ var src=it.c1;
+ if(s<1){var rw2=Math.max(1,Math.min(it.c1.width,Math.round(it.w*s))),rh2=Math.max(1,Math.min(it.c1.height,Math.round(it.h*s))),t=document.createElement('canvas');t.width=rw2;t.height=rh2;
   var tx=t.getContext('2d');tx.imageSmoothingQuality='high';tx.drawImage(it.c1,0,0,rw2,rh2);
-  var ps=(it.c1.width/it.w)/s,c2=$('cpv2');c2.width=mw;c2.height=mh;c2.getContext('2d').drawImage(t,e.dx*ps,e.dy*ps,it.c1.width,it.c1.height);
-  c2.style.width=dw+'px';c2.style.height=dh+'px';c2.style.maxWidth='none';
-  $('cp2t').textContent='Результат (уменьшение на '+Math.round((1-s)*100)+'%): '+Math.max(1,Math.round(it.w*s))+'×'+Math.max(1,Math.round(it.h*s))+(s<1?', растянуто до размера оригинала':'')}
+  src=document.createElement('canvas');src.width=it.c1.width;src.height=it.c1.height;src.getContext('2d').drawImage(t,0,0,it.c1.width,it.c1.height)}
+ c1.getContext('2d').drawImage(src,m+e.dx*ps,m+e.dy*ps);
+ var dw=Math.min(mw,Math.max(120,($('cpw').clientWidth||320)-6)),f=dw/mw;
+ c1.style.width=Math.round(rw*f)+'px';c1.style.height=Math.round(rh*f)+'px';c1.style.maxWidth='none';
+ var so=s<1&&$('ccmp').checked;$('cpw2').style.display=so?'block':'none';$('cp2t').style.display=so?'block':'none';
+ if(so){var c2=$('cpv2');c2.width=mw;c2.height=mh;c2.getContext('2d').drawImage(it.c1,0,0);c2.style.width=Math.round(mw*f)+'px';c2.style.height=Math.round(mh*f)+'px';c2.style.maxWidth='none';$('cp2t').textContent='Оригинал: '+it.w+'×'+it.h}
+ $('cp1t').textContent='Кадр '+(j+1)+' из '+v.length+' · '+it.name+' · '+(s<1?'после уменьшения на '+Math.round((1-s)*100)+'%: '+Math.max(1,Math.round(it.w*s))+'×'+Math.max(1,Math.round(it.h*s))+' (растянуто до размера оригинала)':it.w+'×'+it.h);
+ $('cval').textContent='Кадр №'+(si+1)+' в последовательности: сдвиг '+e.dx+', '+e.dy+' px (в размере листа)'
 }
 $('cl').addEventListener('change',function(){var any=SEQ.some(function(e){return e.dx||e.dy});SEQ.forEach(function(e){e.dx=0;e.dy=0});if(any)toast('Корректировка сброшена: размер кадров изменён');if(SEQ.length)cDraw(cpk)});
+$('cpa').addEventListener('change',function(){cStop();cpk=0;cPrev()});
+$('ccmp').addEventListener('change',function(){if(SEQ.length)cDraw(cpk)});
 $('cpsl').addEventListener('input',function(){cStop();cDraw(+this.value)});
-$('cprv').addEventListener('click',function(){cStop();var n=SEQ.length;if(n)cDraw((cpk-1+n)%n)});
-$('cnxt').addEventListener('click',function(){cStop();var n=SEQ.length;if(n)cDraw((cpk+1)%n)});
-function cPlay(){cStop();if(!SEQ.length)return;$('cplay').textContent='⏸ Пауза';ctimer=setInterval(function(){cDraw((cpk+1)%SEQ.length)},1000/Math.max(1,+$('cfps').value||24))}
+$('cprv').addEventListener('click',function(){cStop();var n=cView().length;if(n)cDraw((cpk-1+n)%n)});
+$('cnxt').addEventListener('click',function(){cStop();var n=cView().length;if(n)cDraw((cpk+1)%n)});
+function cPlay(){cStop();if(!cView().length)return;$('cplay').textContent='⏸ Пауза';ctimer=setInterval(function(){cDraw((cpk+1)%cView().length)},1000/Math.max(1,+$('cfps').value||24))}
 $('cplay').addEventListener('click',function(){if(ctimer)cStop();else cPlay()});
 $('cfps').addEventListener('change',function(){if(ctimer)cPlay()});
-function cAdj(dx,dy){var sc=$('cscope').value,e=SEQ[cpk];if(!e)return;SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&x.it===e.it)||x===e){x.dx+=dx;x.dy+=dy}});cDraw(cpk)}
+function cCur(){return SEQ[cView()[cpk]]}
+function cAdj(dx,dy){var sc=$('cscope').value,e=cCur();if(!e)return;SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&x.it===e.it)||x===e){x.dx+=dx;x.dy+=dy}});cDraw(cpk)}
 $('cL').addEventListener('click',function(){cAdj(-1,0)});$('cR').addEventListener('click',function(){cAdj(1,0)});
 $('cU').addEventListener('click',function(){cAdj(0,-1)});$('cD').addEventListener('click',function(){cAdj(0,1)});
-$('cradj').addEventListener('click',function(){var sc=$('cscope').value,e=SEQ[cpk];SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&e&&x.it===e.it)||x===e){x.dx=0;x.dy=0}});cDraw(cpk)});
+$('cradj').addEventListener('click',function(){var sc=$('cscope').value,e=cCur();SEQ.forEach(function(x){if(sc==='all'||(sc==='src'&&e&&x.it===e.it)||x===e){x.dx=0;x.dy=0}});cDraw(cpk)});
 $('crb').addEventListener('click',function(){
  var f=Math.max(1,+$('crf').value||1),t=Math.min(SEQ.length,+$('crt').value||1),n=Math.max(1,+$('crn').value||1);
  if(!SEQ.length||f>t){toast('Проверь номера кадров');return}
